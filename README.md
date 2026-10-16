@@ -76,7 +76,7 @@ cp .env.example .env
 ```
 Ustaw w `.env`:
 ```ini
-DATABASE_URL=postgresql://USER:PASSWORD@HOST/DATABASE?sslmode=require
+DATABASE_URL=postgresql://USER:PASSWORD@YOUR_NEON_HOST/DBNAME?sslmode=require
 JWT_SECRET=<openssl rand -hex 32>
 FERNET_KEY=<python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())">
 COOKIE_SECURE=true          # za HTTPS
