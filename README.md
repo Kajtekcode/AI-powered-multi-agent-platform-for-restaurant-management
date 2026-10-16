@@ -1,56 +1,58 @@
 # 🍽️ Restaurant Growth OS
 
-**Platforma SaaS dla restauracji — Twój zespół menedżerów AI.** Pięciu wyspecjalizowanych
-agentów analizuje dane z kasy GoPOS, prowadzi audyt firmy, pilnuje progu rentowności,
-liczy realny zysk netto i codziennie rano przygotowuje konkretny plan działania.
+**A SaaS platform for restaurants — your team of AI managers.** Five specialized
+agents analyze data from the GoPOS point-of-sale system, audit your business, track
+your break-even point, calculate your actual net profit, and prepare a practical
+action plan every morning.
 
 Stack: **FastAPI · SQLAlchemy · PostgreSQL (Neon) · Alpine.js + Tailwind · OpenAI/Grok**.
-Architektura **multi-tenant** (wiele restauracji, pełna izolacja danych), instalowalna jako **PWA**.
+The **multi-tenant** architecture supports multiple restaurants with full data
+isolation, and the app can be installed as a **PWA**.
 
 ---
 
-## Spis treści
-1. [Wymagania](#wymagania)
-2. [Szybki start lokalnie (SQLite)](#szybki-start-lokalnie-sqlite)
-3. [Uruchomienie na Neon (Postgres)](#uruchomienie-na-neon-postgres)
-4. [Test krok po kroku](#test-krok-po-kroku)
-5. [Architektura](#architektura)
-6. [Najważniejsze funkcje](#najważniejsze-funkcje)
-7. [Bezpieczeństwo i izolacja](#bezpieczeństwo-i-izolacja)
-8. [Komendy CLI](#komendy-cli)
-9. [Rozwiązywanie problemów](#rozwiązywanie-problemów)
+## Table of contents
+1. [Requirements](#requirements)
+2. [Quick start locally (SQLite)](#quick-start-locally-sqlite)
+3. [Run with Neon (Postgres)](#run-with-neon-postgres)
+4. [Step-by-step test](#step-by-step-test)
+5. [Architecture](#architecture)
+6. [Key features](#key-features)
+7. [Security and isolation](#security-and-isolation)
+8. [CLI commands](#cli-commands)
+9. [Troubleshooting](#troubleshooting)
 
 ---
 
-## Wymagania
-- **Python 3.11+** (testowane na 3.11–3.14)
-- Konto **Neon** (darmowy Postgres serverless) — lub dowolny Postgres
-- Klucz **OpenAI** lub **xAI/Grok** (agenci AI)
-- Dane dostępowe **GoPOS API** dla Twojej restauracji (Organization ID, Client ID, Client Secret)
+## Requirements
+- **Python 3.11+** (tested on 3.11–3.14)
+- A **Neon** account (free serverless Postgres) — or any Postgres instance
+- An **OpenAI** or **xAI/Grok** API key (for AI agents)
+- **GoPOS API** credentials for your restaurant (Organization ID, Client ID, Client Secret)
 
 ---
 
-## Szybki start lokalnie (SQLite)
+## Quick start locally (SQLite)
 
-Najszybszy sposób, żeby zobaczyć aplikację — bez Postgresa, na wbudowanym SQLite.
+The quickest way to try the app — no Postgres required; it uses built-in SQLite.
 
 ```bash
-# 1. Środowisko
+# 1. Environment
 python3 -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
 
-# 2. Konfiguracja
+# 2. Configuration
 cp .env.example .env
-#    Minimalnie ustaw w .env:
+#    Set at least these values in .env:
 #      JWT_SECRET=<openssl rand -hex 32>
 #      FERNET_KEY=<python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())">
-#      OPENAI_API_KEY=... (+ OPENAI_BASE_URL/OPENAI_MODEL jeśli Grok)
-#    DATABASE_URL możesz pominąć — użyje sqlite:///data/dev.db
+#      OPENAI_API_KEY=... (+ OPENAI_BASE_URL/OPENAI_MODEL if using Grok)
+#    DATABASE_URL is optional — the app will use sqlite:///data/dev.db
 
-# 3. Schemat bazy
+# 3. Database schema
 alembic upgrade head
 
-# 4. (opcjonalnie) dane demo — restauracja "Bistro Demo" z 659 zamówieniami
+# 4. (Optional) demo data — "Bistro Demo" restaurant with 659 orders
 python -m app.seed
 #    Login: demo@bistro.pl / demo12345
 
@@ -59,40 +61,42 @@ python run.py
 #    → http://localhost:8000
 ```
 
-Bez danych demo trafisz na ekran rejestracji i przejdziesz pełny onboarding.
+Without demo data, you’ll see the registration screen and can complete the full onboarding process.
 
 ---
 
-## Uruchomienie na Neon (Postgres)
+## Run with Neon (Postgres)
 
-To jest docelowy tryb produkcyjny — z prawdziwą izolacją multi-tenant i RLS.
+This is the intended production setup, with full multi-tenant isolation and RLS.
 
-### 1. Utwórz bazę na Neon
-Załóż projekt na [neon.tech](https://neon.tech), skopiuj **connection string** (z `?sslmode=require`).
+### 1. Create a Neon database
+Create a project at [neon.tech](https://neon.tech) and copy the **connection string**
+(including `?sslmode=require`).
 
-### 2. Skonfiguruj `.env`
+### 2. Configure `.env`
 ```bash
 cp .env.example .env
 ```
-Ustaw w `.env`:
+Set these values in `.env`:
 ```ini
-DATABASE_URL=postgresql://USER:PASSWORD@ep-xxx.eu-central-1.aws.neon.tech/neondb?sslmode=require
+DATABASE_URL=******YOUR_NEON_HOST/DBNAME?sslmode=require
 JWT_SECRET=<openssl rand -hex 32>
 FERNET_KEY=<python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())">
-COOKIE_SECURE=true          # za HTTPS
-OPENAI_API_KEY=...           # lub klucz Grok + OPENAI_BASE_URL + OPENAI_MODEL
+COOKIE_SECURE=true          # when using HTTPS
+OPENAI_API_KEY=...           # or a Grok key + OPENAI_BASE_URL + OPENAI_MODEL
 ```
 
-> ⚠️ **FERNET_KEY** wygeneruj **raz** i nie zmieniaj po zapisaniu kluczy GoPOS — inaczej nie odszyfrujesz zapisanych sekretów.
+> ⚠️ **FERNET_KEY** should be generated **once** and must not be changed after saving GoPOS credentials; otherwise, the stored secrets cannot be decrypted.
 >
-> ⚠️ Jeśli używałeś tymczasowego `DATABASE_URL` z hasłem w jawnej formie — **zrotuj hasło** w panelu Neon przed go-live.
+> ⚠️ If you used a temporary `DATABASE_URL` with a plaintext password, **rotate the password** in the Neon dashboard before going live.
 
-### 3. Migracje (tworzą schemat + włączają RLS)
+### 3. Run migrations (create the schema and enable RLS)
 ```bash
 pip install -r requirements.txt
 alembic upgrade head
 ```
-Na Postgresie ostatnia migracja (`c1f5a7e2b9d0`) **realnie włącza Row-Level Security** na wszystkich tabelach z danymi. Na SQLite ta sama migracja jest pomijana (no-op).
+On Postgres, the final migration (`c1f5a7e2b9d0`) **actually enables Row-Level Security**
+on all data tables. On SQLite, this migration is skipped (no-op).
 
 ### 4. Start
 ```bash
@@ -101,116 +105,127 @@ python run.py --prod
 
 ---
 
-## Test krok po kroku
+## Step-by-step test
 
-Pełna ścieżka, którą warto przejść po wdrożeniu:
+After deployment, it’s worth walking through the complete user journey:
 
-1. **Rejestracja** — wejdź na `/`. Bez sesji przekieruje na `/login`. Kliknij „Załóż konto",
-   podaj nazwę restauracji, miasto, e-mail i hasło (min. 8 znaków).
-2. **Onboarding — krok 2: GoPOS** — kreator przekieruje Cię do ekranu łączenia. Wpisz
-   Organization ID, Client ID i Client Secret z panelu GoPOS. Klucze zostaną **zaszyfrowane**
-   i zapiszą się w bazie; ruszy pobieranie historii w tle.
-3. **Onboarding — krok 3: Audyt** — CEO Agent zada kilkanaście pytań o Twój biznes
-   (wymaga skonfigurowanego LLM). Możesz przerwać i wrócić — postęp się zapisuje.
-4. **Pozostałe kroki** — analiza rynku, przepisy (możesz dodać ze zdjęcia menu), włączenie
-   porannego briefingu. Po ostatnim kroku trafiasz na dashboard.
-5. **Dashboard** — sprawdź zakładki: „Dzisiaj" (próg rentowności na żywo), „Przegląd"
-   (KPI, wykresy), „Menu" (food cost, menu engineering), „Czat" (rozmowa z agentami).
-   W panelu bocznym: nazwa restauracji, e-mail, **Wyloguj**, przełącznik trybu jasny/ciemny.
-6. **Wyloguj / zaloguj** — sprawdź, że sesja działa i po wylogowaniu `/` znów wymaga logowania.
-7. **PWA** — na telefonie otwórz aplikację w przeglądarce → „Dodaj do ekranu głównego".
-   Uruchomi się w trybie pełnoekranowym z własną ikoną.
-8. **Izolacja (opcjonalnie)** — załóż drugie konto z inną restauracją. Zobaczysz, że nie
-   ma dostępu do danych pierwszej — ani przez aplikację, ani (na Postgresie) na poziomie bazy.
+1. **Register** — go to `/`. Without a session, you’ll be redirected to `/login`. Click
+   “Create an account” and enter the restaurant name, city, email, and password (at least
+   8 characters).
+2. **Onboarding — step 2: GoPOS** — the setup wizard will take you to the connection
+   screen. Enter the Organization ID, Client ID, and Client Secret from your GoPOS
+   dashboard. The credentials will be **encrypted** and saved to the database; a
+   background sync of your sales history will begin.
+3. **Onboarding — step 3: Audit** — the CEO Agent will ask several questions about your
+   business (requires an LLM to be configured). You can pause and return later; your
+   progress is saved.
+4. **Remaining steps** — market analysis, recipes (you can add them from a menu photo),
+   and enabling the morning briefing. After the final step, you’ll arrive at the dashboard.
+5. **Dashboard** — check the tabs: “Today” (live break-even point), “Overview” (KPIs and
+   charts), “Menu” (food cost and menu engineering), and “Chat” (talk to the agents).
+   The sidebar shows the restaurant name and email, **Log out**, and the light/dark mode
+   toggle.
+6. **Log out / log in** — verify that the session works and that `/` requires you to log in
+   again after logging out.
+7. **PWA** — on your phone, open the app in a browser and select “Add to Home Screen.”
+   It will launch in full-screen mode with its own icon.
+8. **Isolation (optional)** — create a second account for a different restaurant. Verify
+   that it cannot access the first restaurant’s data — either through the app or (on
+   Postgres) at the database level.
 
 ---
 
-## Architektura
+## Architecture
 
 ```
 app/
-├── main.py              # FastAPI: routing stron, gating onboardingu, PWA, lifespan
+├── main.py              # FastAPI: page routing, onboarding gating, PWA, lifespan
 ├── core/
-│   ├── config.py        # ustawienia (env)
-│   ├── db.py            # engine + sesje (Neon/SQLite), init_db
-│   ├── security.py      # bcrypt, JWT, Fernet (szyfrowanie kluczy POS)
-│   ├── deps.py          # zależności FastAPI: bieżący użytkownik/tenant, gating
-│   ├── tenant_context.py# ContextVar bieżącego tenanta
-│   ├── scheduler.py     # auto-sync + poranny briefing (po wszystkich tenantach)
-│   ├── notifications.py # budowa i wysyłka briefingu
-│   └── telegram_bot.py  # dwukierunkowy bot
-├── models/              # SQLAlchemy: tenant, user, gopos_connection + tabele danych
+│   ├── config.py        # settings (env)
+│   ├── db.py            # engine + sessions (Neon/SQLite), init_db
+│   ├── security.py      # bcrypt, JWT, Fernet (POS credential encryption)
+│   ├── deps.py          # FastAPI dependencies: current user/tenant, gating
+│   ├── tenant_context.py# ContextVar for the current tenant
+│   ├── scheduler.py     # auto-sync + morning briefing (across all tenants)
+│   ├── notifications.py # briefing creation and delivery
+│   └── telegram_bot.py  # two-way bot
+├── models/              # SQLAlchemy: tenant, user, gopos_connection + data tables
 ├── repositories/
-│   ├── store.py         # zapisy/CRUD/KV, ingestia — zawsze zawężone do tenanta (+RLS GUC)
-│   ├── analytics.py     # wszystkie analizy (zysk, food cost, "Dzisiaj", menu engineering…)
-│   └── agent_repo.py    # fasada dla agentów (routuje do store/analytics)
-├── pos/                 # abstrakcja POS: base + gopos + factory (per-tenant)
-├── data/sync.py         # ingestion przez providera (backfill/incremental/all-tenants)
-├── agents/orchestra.py  # 5 agentów AI + narzędzia (tool calling)
-├── api/                 # endpointy: auth, onboarding, dashboard, chat, recipes, sync, webhooks
+│   ├── store.py         # writes/CRUD/KV, ingestion — always tenant-scoped (+RLS GUC)
+│   ├── analytics.py     # all analytics (profit, food cost, "Today", menu engineering…)
+│   └── agent_repo.py    # agent-facing facade (routes to store/analytics)
+├── pos/                 # POS abstraction: base + gopos + factory (per tenant)
+├── data/sync.py         # ingestion through provider (backfill/incremental/all tenants)
+├── agents/orchestra.py  # 5 AI agents + tools (tool calling)
+├── api/                 # endpoints: auth, onboarding, dashboard, chat, recipes, sync, webhooks
 ├── migrations/          # Alembic (initial → pos_type → RLS)
-├── static/              # design-system.css (Kierunek C), manifest.json, sw.js, ikony
+├── static/              # design-system.css (Direction C), manifest.json, sw.js, icons
 └── templates/           # login, onboarding, onboarding_gopos, dashboard (Alpine.js SPA)
 ```
 
-**Multi-tenancy (dwie warstwy):**
-1. Ręczne zawężanie po `tenant_id` w repozytoriach — `tenant_id` zawsze z JWT, nigdy z inputu.
-2. **Row-Level Security** na Postgresie — `SET app.current_tenant` na połączeniu; baza odcina
-   cudze wiersze nawet gdyby filtr w kodzie umknął.
+**Multi-tenancy (two layers):**
+1. Manual filtering by `tenant_id` in repositories — `tenant_id` always comes from the
+   JWT, never from user input.
+2. **Row-Level Security** on Postgres — `SET app.current_tenant` on the connection; the
+   database blocks access to other tenants’ rows even if a code-level filter is missed.
 
 ---
 
-## Najważniejsze funkcje
+## Key features
 
-- **„Dzisiaj" na żywo** — próg rentowności dnia, utarg vs próg, projekcja końca dnia z krzywej
-  godzinowej, tempo vs ten sam dzień tydzień temu.
-- **Realny zysk netto** — przychód − food cost − koszty pracy (z grafików) − koszty stałe;
-  dowolny okres, w tym miesiące historyczne.
-- **Menu & food cost** — pokrycie recepturami, menu engineering (gwiazdy/konie/zagadki/psy),
-  panel „wymaga uwagi".
-- **Audyt + plan** — wywiad CEO → profil → research → plan 90-dniowy → cele z auto-postępem.
-- **Pięciu agentów** — CEO, Financial, Menu, Growth, Operations (tool calling na realnych danych).
-- **Poranny briefing** — Telegram/Slack, codziennie rano.
-- **PWA** — instalowalna na telefon, działa pełnoekranowo.
-
----
-
-## Bezpieczeństwo i izolacja
-- Hasła: **bcrypt**. Sesje: **JWT** w cookie `httpOnly` (ustaw `COOKIE_SECURE=true` za HTTPS).
-- Klucze GoPOS: szyfrowane **Fernet** at-rest (nie są nigdzie pokazywane ponownie).
-- GoPOS: tryb **tylko do odczytu** (`GOPOS_READ_ONLY=true`) — nigdy nie zapisujemy do kasy.
-- Izolacja tenantów: filtr `tenant_id` + RLS (Postgres).
+- **Live “Today” view** — daily break-even point, sales vs. target, end-of-day projection
+  based on the hourly curve, and pace vs. the same day last week.
+- **Actual net profit** — revenue − food cost − labor costs (from schedules) − fixed costs;
+  any date range, including historical months.
+- **Menu & food cost** — recipe coverage, menu engineering (stars/plow horses/puzzles/dogs),
+  and an “attention required” panel.
+- **Audit + plan** — CEO interview → profile → research → 90-day plan → goals with
+  automatically updated progress.
+- **Five agents** — CEO, Financial, Menu, Growth, and Operations (tool calling with real data).
+- **Morning briefing** — via Telegram/Slack, every morning.
+- **PWA** — installable on a phone and runs full-screen.
 
 ---
 
-## Komendy CLI
+## Security and isolation
+- Passwords: **bcrypt**. Sessions: **JWT** in an `httpOnly` cookie (set `COOKIE_SECURE=true`
+  when using HTTPS).
+- GoPOS credentials: encrypted at rest with **Fernet** (they are never displayed again).
+- GoPOS: **read-only** mode (`GOPOS_READ_ONLY=true`) — the app never writes to the POS.
+- Tenant isolation: `tenant_id` filtering + RLS (Postgres).
+
+---
+
+## CLI commands
 ```bash
-python -m app.seed                       # dane demo (Bistro Demo)
-alembic upgrade head                     # migracje (schemat + RLS na Postgresie)
-alembic downgrade -1                      # cofnij ostatnią migrację
-python cli.py db-status                   # status danych (pierwsza/wskazana restauracja)
-python cli.py sync --hours 24             # ręczny sync przyrostowy
-python cli.py backfill --days 180         # backfill historii
-python cli.py ask "Jaki był zysk w maju?" # zapytaj CEO Agenta z terminala
+python -m app.seed                       # demo data (Bistro Demo)
+alembic upgrade head                     # migrations (schema + RLS on Postgres)
+alembic downgrade -1                     # roll back the latest migration
+python cli.py db-status                   # data status (first/specified restaurant)
+python cli.py sync --hours 24             # manual incremental sync
+python cli.py backfill --days 180         # historical backfill
+python cli.py ask "What was the profit in May?" # ask the CEO Agent from the terminal
 ```
 
 ---
 
-## Rozwiązywanie problemów
+## Troubleshooting
 
-**`alembic upgrade head` nie łączy się z Neon**
-Sprawdź `DATABASE_URL` (z `?sslmode=require`). W niektórych sieciach trzeba użyć
-połączenia bez poolingu (endpoint „direct" w panelu Neon).
+**`alembic upgrade head` cannot connect to Neon**
+Check `DATABASE_URL` (it must include `?sslmode=require`). On some networks, you may need
+to use a non-pooled connection (the “direct” endpoint in the Neon dashboard).
 
-**Agent nie odpowiada / błąd LLM**
-Sprawdź `OPENAI_API_KEY`. Dla Grok ustaw też `OPENAI_BASE_URL=https://api.x.ai/v1`,
-`OPENAI_MODEL=grok-3-latest`, a do importu menu ze zdjęcia `OPENAI_VISION_MODEL=grok-2-vision-1212`.
+**The agent does not respond / LLM error**
+Check `OPENAI_API_KEY`. For Grok, also set `OPENAI_BASE_URL=https://api.x.ai/v1`,
+`OPENAI_MODEL=grok-3-latest`, and, to import a menu from a photo,
+`OPENAI_VISION_MODEL=grok-2-vision-1212`.
 
-**Nie odszyfrowuje kluczy GoPOS**
-`FERNET_KEY` zmienił się po zapisaniu danych. Przywróć poprzedni klucz albo połącz GoPOS ponownie.
+**Cannot decrypt GoPOS credentials**
+`FERNET_KEY` changed after the credentials were saved. Restore the previous key or reconnect
+GoPOS.
 
-**Tryb jasny/ciemny**
-Aplikacja podąża za ustawieniem systemu; przełącznik w panelu bocznym wymusza tryb (zapis w przeglądarce).
+**Light/dark mode**
+The app follows the system setting; the sidebar toggle overrides the mode (saved in the browser).
 
-**Scheduler/sync nie działa w testach**
-Ustaw `DISABLE_SCHEDULER=true`.
+**Scheduler/sync does not run in tests**
+Set `DISABLE_SCHEDULER=true`.
