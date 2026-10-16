@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Restaurant Growth OS — Połącz GoPOS</title>
+<link rel="stylesheet" href="/static/design-system.css">
+<style>
+  body{display:flex;flex-direction:column;min-height:100dvh}
+  .screen{flex:1;display:flex;flex-direction:column;max-width:480px;width:100%;margin:0 auto}
+  .top{display:flex;align-items:center;justify-content:space-between;padding:var(--s-4) var(--s-5) 0}
+  .back{background:none;border:none;color:var(--ink-2);font:inherit;font-size:var(--t-sm);cursor:pointer;
+    display:flex;align-items:center;gap:6px;font-family:var(--mono)}
+  .meta{font-family:var(--mono);font-size:11.5px;color:var(--ink-3)}
+  .content{flex:1;padding:var(--s-5) var(--s-5) 0;overflow:auto}
+  h1{margin:var(--s-3) 0}
+  .lede{color:var(--ink-2);line-height:1.55;margin-bottom:var(--s-5);max-width:36ch}
+  .readonly-note{display:flex;gap:10px;align-items:flex-start;background:var(--ok-soft);color:var(--ok-ink);
+    border-radius:var(--r);padding:12px 14px;font-size:var(--t-sm);line-height:1.45;margin-bottom:var(--s-5)}
+  .err-box{background:var(--danger-soft);color:var(--danger-ink);font-size:var(--t-sm);padding:10px 14px;
+    border-radius:var(--r);margin-bottom:var(--s-4);display:flex;gap:8px;align-items:flex-start}
+  .ok-box{background:var(--ok-soft);color:var(--ok-ink);font-size:var(--t-sm);padding:10px 14px;
+    border-radius:var(--r);margin-bottom:var(--s-4);display:flex;gap:8px;align-items:center}
+  .help{font-size:var(--t-xs);color:var(--ink-3);margin-top:-2px;line-height:1.5}
+  .footer{padding:var(--s-4) var(--s-5);border-top:1px solid var(--line)}
+  details{margin-bottom:var(--s-5);border:1px solid var(--line);border-radius:var(--r);padding:0}
+  summary{padding:13px 14px;cursor:pointer;font-size:var(--t-sm);color:var(--ink-2);font-weight:500;list-style:none}
+  summary::-webkit-details-marker{display:none}
+  details[open] summary{border-bottom:1px solid var(--line)}
+  details .body{padding:13px 14px;font-size:var(--t-sm);color:var(--ink-2);line-height:1.6}
+  details .body ol{margin:8px 0 0 18px}
+  details .body li{margin-bottom:5px}
+  .seg-group{display:flex;gap:6px;flex-wrap:wrap}
+  .seg-opt{flex:1;min-width:64px;height:40px;border:1px solid var(--line-2);background:var(--surface);
+    color:var(--ink-2);font:inherit;font-size:var(--t-sm);font-weight:500;border-radius:var(--r);cursor:pointer;
+    transition:all var(--t-fast) var(--ease)}
+  .seg-opt.on{border-color:var(--accent);background:var(--accent-soft);color:var(--accent-ink)}
+  .progress-panel{text-align:center;padding:var(--s-5) 0}
+  .progress-ring{width:64px;height:64px;margin:0 auto var(--s-4);border:3px solid var(--line-2);
+    border-top-color:var(--accent);border-radius:50%;animation:spin .8s linear infinite}
+  .progress-count{font-family:var(--mono);font-size:var(--t-2xl);font-weight:600;color:var(--ink);letter-spacing:-.02em}
+  .progress-label{font-size:var(--t-sm);color:var(--ink-2);margin-top:var(--s-2)}
+  .progress-month{font-family:var(--mono);font-size:var(--t-xs);color:var(--ink-3);margin-top:var(--s-3)}
+</style>
+<link rel="manifest" href="/manifest.json">
+<meta name="theme-color" content="#0B0D11">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<link rel="apple-touch-icon" href="/static/icons/apple-touch-icon.png">
+</head>
+<body x-data="gopos()" x-cloak>
+  <div class="screen">
+    <div class="top">
+      <button class="back" @click="location.href='/onboarding'">← kreator</button>
+      <span class="meta">SETUP · 02/06</span>
+    </div>
+
+    <div class="content">
+      <div class="kicker mono">// krok 02 — gopos</div>
+      <h1>Połącz kasę GoPOS</h1>
+      <p class="lede">Wpisz dane dostępowe z panelu GoPOS. Pobierzemy historię zamówień, pozycji menu i grafików.</p>
+
+      <div class="readonly-note">
+        <span>🔒</span>
+        <span>Łączymy się <b>tylko do odczytu</b>. Niczego nie zmieniamy ani nie zapisujemy w Twojej kasie. Klucze przechowujemy zaszyfrowane.</span>
+      </div>
+
+      <details>
+        <summary>Gdzie znajdę te dane?</summary>
+        <div class="body">
+          W panelu GoPOS: Ustawienia → API / Integracje → utwórz aplikację (typ: tylko odczyt).
+          <ol>
+            <li><b>Organization ID</b> — identyfikator Twojej organizacji</li>
+            <li><b>Client ID</b> — identyfikator aplikacji API</li>
+            <li><b>Client Secret</b> — klucz tajny (pokazywany raz)</li>
+          </ol>
+        </div>
+      </details>
+
+      <div class="err-box" x-show="error" x-cloak><span>⚠</span><span x-text="error"></span></div>
+
+      <!-- FORM (before connect) -->
+      <div x-show="!connected">
+      <div class="field">
+        <label for="org">Organization ID</label>
+        <input id="org" class="input mono" x-model="form.organization_id" placeholder="np. 5038" inputmode="numeric">
+      </div>
+      <div class="field">
+        <label for="cid">Client ID</label>
+        <input id="cid" class="input mono" x-model="form.client_id" placeholder="client_xxx" autocomplete="off">
+      </div>
+      <div class="field">
+        <label for="csec">Client Secret</label>
+        <input id="csec" class="input mono" type="password" x-model="form.client_secret"
+               placeholder="••••••••••••" autocomplete="off" @keydown.enter="connect()">
+        <div class="help">Klucz zostanie zaszyfrowany i nie będzie nigdzie pokazywany ponownie.</div>
+      </div>
+
+      <div class="field">
+        <label>Ile historii pobrać?</label>
+        <div class="seg-group">
+          <template x-for="opt in historyOptions" :key="opt.v">
+            <button type="button" class="seg-opt" :class="form.history_months===opt.v && 'on'"
+                    @click="form.history_months=opt.v" x-text="opt.label"></button>
+          </template>
+        </div>
+        <div class="help" x-text="form.history_months===0
+          ? 'Pobierzemy całą dostępną historię z GoPOS (może potrwać kilka minut).'
+          : 'Pobierzemy dane z wybranego okresu wstecz.'"></div>
+      </div>
+      </div>
+
+      <!-- PROGRESS (after connect) -->
+      <div class="progress-panel" x-show="connected" x-cloak>
+        <div class="progress-ring" x-show="bf.status!=='done'"></div>
+        <div x-show="bf.status==='done'" style="font-size:40px;margin-bottom:8px">✓</div>
+        <div class="progress-count" x-text="(bf.orders||0).toLocaleString('pl-PL')"></div>
+        <div class="progress-label" x-text="bf.status==='done'
+          ? 'Gotowe — historia pobrana.'
+          : (bf.status==='error' ? 'Pobieranie napotkało błąd — dane częściowe.' : 'Pobieram zamówienia z GoPOS…')"></div>
+        <div class="progress-month" x-show="bf.current_month && bf.status!=='done'"
+             x-text="'aktualnie: ' + bf.current_month"></div>
+        <div class="progress-month" x-show="bf.oldest" x-text="'najstarsze dane: ' + bf.oldest"></div>
+      </div>
+    </div>
+
+    <div class="footer safe-bottom">
+      <button class="btn btn-primary" x-show="!connected" @click="connect()" :disabled="busy">
+        <span x-show="busy" class="spinner"></span>
+        <span x-text="busy ? '' : 'Połącz i pobierz dane'"></span>
+      </button>
+      <button class="btn btn-primary" x-show="connected" @click="location.href='/onboarding'">
+        <span x-text="bf.status==='done' ? 'Dalej →' : 'Kontynuuj w tle →'"></span>
+      </button>
+    </div>
+  </div>
+  <div x-show="false"></div>
+
+<script>
+function gopos(){
+  return {
+    busy:false, connected:false, error:'',
+    form:{ organization_id:'', client_id:'', client_secret:'', history_months:0 },
+    historyOptions:[
+      {v:0, label:'Wszystko'},
+      {v:24, label:'2 lata'},
+      {v:12, label:'1 rok'},
+      {v:6, label:'6 mies.'},
+    ],
+    bf:{ status:'idle', orders:0, oldest:null, current_month:null },
+    _poll:null,
+    async init(){
+      const t=localStorage.getItem('rgos-theme');
+      if(t){ document.documentElement.classList.remove('light','dark'); document.documentElement.classList.add(t); }
+      // If GoPOS is already connected (e.g. user navigated back), don't ask for
+      // keys again — show the backfill status and let them continue.
+      try{
+        const s=await fetch('/api/onboarding/status');
+        if(s.ok){
+          const d=await s.json();
+          if(d.completed_rank >= 1){   // gopos_connected or later already done
+            this.connected=true;
+            this.pollProgress();
+          }
+        }
+      }catch(e){}
+    },
+    async connect(){
+      this.error='';
+      if(!this.form.organization_id.trim() || !this.form.client_id.trim() || !this.form.client_secret.trim()){
+        this.error='Uzupełnij wszystkie trzy pola.'; return;
+      }
+      this.busy=true;
+      try{
+        const r=await fetch('/api/onboarding/gopos/connect',{method:'POST',
+          headers:{'Content-Type':'application/json'}, body:JSON.stringify(this.form)});
+        if(r.status===401){ location.href='/login'; return; }
+        if(!r.ok){
+          const d=await r.json().catch(()=>({}));
+          this.error=(d.detail && typeof d.detail==='string') ? d.detail : 'Nie udało się połączyć. Sprawdź klucze i spróbuj ponownie.';
+          this.busy=false; return;
+        }
+        // connected → show live backfill progress
+        this.connected=true; this.busy=false;
+        this.pollProgress();
+      }catch(e){
+        this.error='Brak połączenia z serwerem.'; this.busy=false;
+      }
+    },
+    async pollProgress(){
+      const tick=async()=>{
+        try{
+          const r=await fetch('/api/onboarding/gopos/backfill-status');
+          if(r.ok){
+            this.bf=await r.json();
+            if(this.bf.status==='done' || this.bf.status==='error'){ clearInterval(this._poll); }
+          }
+        }catch(e){}
+      };
+      await tick();
+      this._poll=setInterval(tick, 2000);
+    },
+  };
+}
+</script>
+<script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+<script>if('serviceWorker' in navigator){window.addEventListener('load',()=>navigator.serviceWorker.register('/sw.js').catch(()=>{}));}</script>
+</body>
+</html>

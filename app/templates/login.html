@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Restaurant Growth OS — Logowanie</title>
+<link rel="stylesheet" href="/static/design-system.css">
+<style>
+  body{display:flex;flex-direction:column;min-height:100dvh}
+  .wrap{flex:1;display:flex;flex-direction:column;justify-content:center;
+    max-width:440px;width:100%;margin:0 auto;padding:var(--s-6) var(--s-5)}
+  .brand{display:flex;align-items:center;gap:10px;margin-bottom:var(--s-7)}
+  .brand .mark{width:32px;height:32px;border-radius:8px;background:var(--ink);color:var(--bg);
+    display:flex;align-items:center;justify-content:center;font-size:16px}
+  .brand b{font-size:var(--t-md);font-weight:600;letter-spacing:-.01em}
+  .kicker{margin-bottom:var(--s-3)}
+  h1{margin-bottom:var(--s-2)}
+  .sub{color:var(--ink-2);margin-bottom:var(--s-6);font-size:var(--t-base)}
+  .err-box{background:var(--danger-soft);color:var(--danger-ink);font-size:var(--t-sm);
+    padding:10px 14px;border-radius:var(--r);margin-bottom:var(--s-4);display:flex;gap:8px;align-items:flex-start}
+  .row2{display:grid;grid-template-columns:1fr;gap:0}
+  .switch{margin-top:var(--s-5);text-align:center;font-size:var(--t-sm);color:var(--ink-2)}
+  .switch button{background:none;border:none;font:inherit;font-size:var(--t-sm);color:var(--accent-ink);
+    font-weight:500;cursor:pointer;padding:0 2px}
+  .topbar{display:flex;justify-content:flex-end;padding:var(--s-4) var(--s-5) 0}
+  .theme-toggle{background:none;border:1px solid var(--line-2);border-radius:var(--r-pill);width:36px;height:36px;
+    cursor:pointer;color:var(--ink-2);font-size:15px;display:flex;align-items:center;justify-content:center}
+  .legal{margin-top:var(--s-7);font-size:var(--t-xs);color:var(--ink-3);text-align:center;line-height:1.6}
+  .pw-wrap{position:relative}
+  .pw-wrap .eye{position:absolute;right:10px;top:50%;transform:translateY(-50%);background:none;border:none;
+    color:var(--ink-3);cursor:pointer;font-size:13px;font-family:var(--mono)}
+</style>
+<link rel="manifest" href="/manifest.json">
+<meta name="theme-color" content="#0B0D11">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<link rel="apple-touch-icon" href="/static/icons/apple-touch-icon.png">
+</head>
+<body x-data="authPage()" x-cloak>
+  <div class="topbar">
+    <button class="theme-toggle" @click="toggleTheme()" :title="theme==='dark'?'Tryb jasny':'Tryb ciemny'"
+            x-text="theme==='dark' ? '☀' : '☾'"></button>
+  </div>
+
+  <div class="wrap">
+    <div class="brand"><span class="mark">◍</span><b>Restaurant Growth OS</b></div>
+
+    <div class="kicker mono" x-text="mode==='login' ? '// witaj ponownie' : '// nowe konto'"></div>
+    <h1 x-text="mode==='login' ? 'Zaloguj się' : 'Załóż konto'"></h1>
+    <p class="sub" x-text="mode==='login'
+       ? 'Wpisz dane, aby wrócić do swojego panelu.'
+       : 'Kilka sekund i przejdziesz do konfiguracji restauracji.'"></p>
+
+    <div class="err-box" x-show="error" x-cloak><span>⚠</span><span x-text="error"></span></div>
+
+    <!-- REGISTER-only: restaurant -->
+    <div class="field" x-show="mode==='register'" x-cloak>
+      <label for="rname">Nazwa restauracji</label>
+      <input id="rname" class="input" x-model="form.restaurant_name" placeholder="np. Bistro Nadwiślańskie"
+             autocomplete="organization">
+    </div>
+    <div class="field" x-show="mode==='register'" x-cloak>
+      <label for="city">Miasto</label>
+      <input id="city" class="input" x-model="form.city" placeholder="np. Warszawa" autocomplete="address-level2">
+    </div>
+
+    <div class="field">
+      <label for="email">E-mail</label>
+      <input id="email" class="input" type="email" x-model="form.email" placeholder="ty@restauracja.pl"
+             autocomplete="email" :class="fieldErr==='email' && 'err'">
+    </div>
+
+    <div class="field">
+      <label for="pw">Hasło</label>
+      <div class="pw-wrap">
+        <input id="pw" class="input" :type="showPw?'text':'password'" x-model="form.password"
+               placeholder="min. 8 znaków" :autocomplete="mode==='login'?'current-password':'new-password'"
+               :class="fieldErr==='password' && 'err'" @keydown.enter="submit()">
+        <button class="eye" @click="showPw=!showPw" x-text="showPw?'ukryj':'pokaż'" type="button"></button>
+      </div>
+    </div>
+
+    <button class="btn btn-primary" @click="submit()" :disabled="loading" style="margin-top:var(--s-2)">
+      <span x-show="loading" class="spinner"></span>
+      <span x-text="loading ? '' : (mode==='login' ? 'Zaloguj się' : 'Utwórz konto i zacznij')"></span>
+    </button>
+
+    <div class="switch">
+      <span x-text="mode==='login' ? 'Nie masz jeszcze konta?' : 'Masz już konto?'"></span>
+      <button @click="toggleMode()" x-text="mode==='login' ? 'Załóż konto' : 'Zaloguj się'"></button>
+    </div>
+
+    <p class="legal" x-show="mode==='register'" x-cloak>
+      Zakładając konto akceptujesz regulamin i politykę prywatności.<br>
+      Twoje dane sprzedażowe pozostają prywatne i odizolowane.
+    </p>
+  </div>
+
+<script>
+function authPage(){
+  return {
+    mode:'login', loading:false, error:'', fieldErr:'', showPw:false,
+    theme: document.documentElement.classList.contains('dark') ? 'dark' : 'light',
+    form:{ email:'', password:'', restaurant_name:'', city:'' },
+
+    init(){
+      const saved = localStorage.getItem('rgos-theme');
+      if(saved){ this.applyTheme(saved); }
+      else { this.theme = matchMedia('(prefers-color-scheme: dark)').matches ? 'dark':'light'; }
+      if(location.hash==='#register') this.mode='register';
+    },
+    applyTheme(t){
+      this.theme=t;
+      document.documentElement.classList.remove('light','dark');
+      document.documentElement.classList.add(t);
+    },
+    toggleTheme(){ const t=this.theme==='dark'?'light':'dark'; this.applyTheme(t); localStorage.setItem('rgos-theme',t); },
+    toggleMode(){ this.mode = this.mode==='login'?'register':'login'; this.error=''; this.fieldErr=''; },
+
+    validate(){
+      this.fieldErr='';
+      if(!this.form.email || !this.form.email.includes('@')){ this.fieldErr='email'; this.error='Podaj poprawny adres e-mail.'; return false; }
+      if(this.form.password.length < 8){ this.fieldErr='password'; this.error='Hasło musi mieć co najmniej 8 znaków.'; return false; }
+      if(this.mode==='register' && !this.form.restaurant_name.trim()){ this.error='Podaj nazwę restauracji.'; return false; }
+      return true;
+    },
+
+    async submit(){
+      this.error='';
+      if(!this.validate()) return;
+      this.loading=true;
+      try{
+        const url = this.mode==='login' ? '/api/auth/login' : '/api/auth/register';
+        const body = this.mode==='login'
+          ? { email:this.form.email, password:this.form.password }
+          : { email:this.form.email, password:this.form.password,
+              restaurant_name:this.form.restaurant_name, city:this.form.city || null };
+        const r = await fetch(url, {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body)});
+        if(!r.ok){
+          const d = await r.json().catch(()=>({}));
+          if(r.status===409) this.error='Konto z tym adresem już istnieje. Zaloguj się.';
+          else if(r.status===401) this.error='Nieprawidłowy e-mail lub hasło.';
+          else if(r.status===422){
+            const loc = Array.isArray(d.detail) ? d.detail.find(x => (x.loc||[]).includes('email')) : null;
+            if(loc){ this.fieldErr='email'; this.error='Ten adres e-mail nie jest prawidłowy (np. domeny .local nie są dozwolone).'; }
+            else { this.fieldErr='password'; this.error='Sprawdź dane — hasło musi mieć co najmniej 8 znaków.'; }
+          }
+          else this.error = (d.detail && typeof d.detail==='string') ? d.detail : 'Coś poszło nie tak. Spróbuj ponownie.';
+          this.loading=false; return;
+        }
+        // success → cookie set by server; go to app (onboarding gate decides where)
+        window.location.href = '/';
+      }catch(e){
+        this.error='Brak połączenia z serwerem. Sprawdź internet i spróbuj ponownie.';
+        this.loading=false;
+      }
+    },
+  };
+}
+</script>
+<script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+<script>if('serviceWorker' in navigator){window.addEventListener('load',()=>navigator.serviceWorker.register('/sw.js').catch(()=>{}));}</script>
+</body>
+</html>

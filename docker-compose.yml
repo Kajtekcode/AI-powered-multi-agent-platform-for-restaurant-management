@@ -1,0 +1,22 @@
+version: '3.9'
+
+services:
+  app:
+    build: .
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./data:/app/data          # persist local SQLite (if no DATABASE_URL)
+      - ./.env:/app/.env:ro       # mount env file (DATABASE_URL, JWT_SECRET, FERNET_KEY, LLM keys)
+    environment:
+      - APP_ENV=production
+    # Run migrations (schema + RLS on Postgres) before starting the server.
+    command: >
+      sh -c "alembic upgrade head &&
+             uvicorn app.main:app --host 0.0.0.0 --port 8000"
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3

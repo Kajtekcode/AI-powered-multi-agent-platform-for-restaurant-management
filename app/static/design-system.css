@@ -1,0 +1,139 @@
+/* ============================================================================
+   Restaurant Growth OS — Design System (Kierunek C: Precise)
+   Single source of truth. Every screen imports this and uses ONLY these tokens.
+   Light + dark via prefers-color-scheme; .light / .dark force a mode.
+   ============================================================================ */
+
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;450;500;600;700;800&display=swap');
+
+/* ── DARK is the default (premium, deep). Light mode via html.light ── */
+:root{
+  /* surfaces — deep near-black with layered cards */
+  --bg:#0A0A0C; --surface:#141417; --surface-2:#1B1B20;
+  /* ink */
+  --ink:#FAFAFA; --ink-2:#A1A1AA; --ink-3:#6B6B73;
+  /* lines — barely-there */
+  --line:rgba(255,255,255,.07); --line-2:rgba(255,255,255,.12);
+  /* accent — restrained violet */
+  --accent:#A855F7; --accent-2:#8B5CF6; --accent-soft:rgba(168,85,247,.13); --accent-ink:#C9A2F9;
+  /* semantic (tuned for dark) */
+  --ok:#34D399; --ok-soft:rgba(52,211,153,.13); --ok-ink:#6EE7B7;
+  --warn:#FBBF24; --warn-soft:rgba(251,191,36,.13); --warn-ink:#FCD34D;
+  --danger:#F87171; --danger-soft:rgba(248,113,113,.13); --danger-ink:#FCA5A5;
+  /* radii — generous, modern */
+  --r-sm:10px; --r:14px; --r-lg:20px; --r-pill:999px;
+  /* type — grotesk everywhere; tight display */
+  --font-display:"Inter",-apple-system,BlinkMacSystemFont,system-ui,sans-serif;
+  --font:"Inter",-apple-system,BlinkMacSystemFont,"Segoe UI",system-ui,sans-serif;
+  --mono:"SF Mono",ui-monospace,"JetBrains Mono",Menlo,Consolas,monospace;
+  /* type scale */
+  --t-xs:12px; --t-sm:13px; --t-base:15px; --t-md:17px; --t-lg:22px; --t-xl:30px; --t-2xl:40px;
+  /* spacing (4px base) — generous */
+  --s-1:4px; --s-2:8px; --s-3:12px; --s-4:16px; --s-5:24px; --s-6:32px; --s-7:48px; --s-8:72px;
+  /* motion */
+  --ease:cubic-bezier(.22,1,.36,1); --t-fast:160ms; --t-mid:280ms;
+  /* elevation — soft glow on dark */
+  --shadow:0 1px 2px rgba(0,0,0,.4), 0 12px 32px -8px rgba(0,0,0,.5);
+  --shadow-sm:0 1px 2px rgba(0,0,0,.3), 0 4px 16px -6px rgba(0,0,0,.4);
+  --glow:0 0 0 1px rgba(168,85,247,.18), 0 8px 32px -8px rgba(168,85,247,.22);
+  --page:#0A0A0C;
+}
+
+/* ── LIGHT mode (opt-in via html.light) ── */
+html.light{
+  --bg:#FBFAFB; --surface:#FFFFFF; --surface-2:#F4F4F6;
+  --ink:#18181B; --ink-2:#5E5E66; --ink-3:#9C9CA5;
+  --line:rgba(24,24,27,.08); --line-2:rgba(24,24,27,.14);
+  --accent:#8B5CF6; --accent-2:#7C3AED; --accent-soft:rgba(139,92,246,.10); --accent-ink:#6D28D9;
+  --ok:#0E9D6E; --ok-soft:#E2F4EC; --ok-ink:#0A6B4C;
+  --warn:#BA7517; --warn-soft:#FAEEDA; --warn-ink:#854F0B;
+  --danger:#D8453A; --danger-soft:#FBEAE8; --danger-ink:#A3271E;
+  --shadow:0 1px 2px rgba(24,24,27,.04), 0 10px 28px -8px rgba(24,24,27,.10);
+  --shadow-sm:0 1px 2px rgba(24,24,27,.05), 0 2px 10px -3px rgba(24,24,27,.06);
+  --glow:0 0 0 1px rgba(139,92,246,.16), 0 8px 28px -10px rgba(139,92,246,.18);
+  --page:#FBFAFB;
+}
+
+/* html.dark is the default look; class kept for the toggle to force it back from light */
+html.dark{ /* uses :root defaults */ }
+
+/* ---- reset ---- */
+*{box-sizing:border-box;margin:0;padding:0;-webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility}
+html,body{height:100%}
+body{font-family:var(--font);background:var(--bg);color:var(--ink);font-size:var(--t-base);line-height:1.5;
+  background-image:radial-gradient(1200px 600px at 50% -10%, rgba(168,85,247,.06), transparent 70%);
+  background-attachment:fixed}
+html.light body{background-image:none}
+::selection{background:var(--accent-soft);color:var(--accent-ink)}
+
+/* ---- typography helpers ---- */
+.mono{font-family:var(--mono);font-variant-numeric:tabular-nums}
+.num{font-variant-numeric:tabular-nums}
+h1{font-family:var(--font-display);font-size:32px;line-height:1.1;letter-spacing:-.02em;font-weight:600}
+h2{font-family:var(--font-display);font-size:23px;line-height:1.18;letter-spacing:-.015em;font-weight:600}
+h3{font-size:var(--t-md);line-height:1.3;letter-spacing:-.01em;font-weight:600}
+.kicker{font-family:var(--mono);font-size:var(--t-xs);letter-spacing:.08em;text-transform:uppercase;color:var(--accent-ink)}
+.muted{color:var(--ink-2)}
+.hint{color:var(--ink-3);font-size:var(--t-sm)}
+
+/* ---- buttons ---- */
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;height:44px;padding:0 18px;
+  border-radius:var(--r);border:1px solid var(--line-2);background:var(--surface);color:var(--ink);
+  font:inherit;font-size:var(--t-base);font-weight:500;cursor:pointer;transition:background var(--t-fast) var(--ease),
+  border-color var(--t-fast) var(--ease),transform var(--t-fast) var(--ease)}
+.btn:hover{background:var(--surface-2)}
+.btn:active{transform:scale(.985)}
+.btn:disabled{opacity:.5;cursor:not-allowed}
+.btn-primary{background:var(--accent);border-color:transparent;color:#fff;height:52px;font-size:var(--t-md);width:100%}
+.btn-primary:hover{background:var(--accent-2)}
+.btn-ghost{background:none;border-color:transparent;color:var(--ink-3);font-family:var(--mono);font-size:var(--t-sm)}
+.btn-ghost:hover{background:var(--surface-2);color:var(--ink-2)}
+
+/* ---- inputs ---- */
+.field{display:flex;flex-direction:column;gap:7px;margin-bottom:var(--s-4)}
+.field label{font-size:var(--t-sm);font-weight:500;color:var(--ink-2)}
+.input{height:48px;padding:0 14px;border-radius:var(--r);border:1px solid var(--line-2);background:var(--surface);
+  color:var(--ink);font:inherit;font-size:var(--t-base);transition:border-color var(--t-fast) var(--ease),
+  box-shadow var(--t-fast) var(--ease);width:100%}
+.input::placeholder{color:var(--ink-3)}
+.input:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
+.input.err{border-color:var(--danger)}
+
+/* ---- cards ---- */
+.card{background:var(--surface);border:1px solid var(--line);border-radius:var(--r-lg);padding:var(--s-5);
+  box-shadow:var(--shadow-sm)}
+
+/* ---- segmented progress (onboarding signature) ---- */
+.segs{display:flex;gap:5px}
+.segs > i{flex:1;height:4px;border-radius:2px;background:var(--line-2);transition:background var(--t-mid) var(--ease)}
+.segs > i.done{background:var(--ok)}
+.segs > i.now{background:var(--accent)}
+
+/* ---- pills / tags ---- */
+.tag{font-family:var(--mono);font-size:11px;letter-spacing:.03em;padding:3px 8px;border-radius:6px;
+  text-transform:uppercase;display:inline-flex;align-items:center;gap:5px}
+.tag-ok{color:var(--ok-ink);background:var(--ok-soft)}
+.tag-now{background:var(--accent-soft);color:var(--accent-ink)}
+.tag-wait{color:var(--ink-3);background:var(--surface-2)}
+
+/* ---- utility ---- */
+.safe-bottom{padding-bottom:calc(var(--s-4) + env(safe-area-inset-bottom))}
+.divider{height:1px;background:var(--line);border:0}
+[x-cloak]{display:none!important}
+.spinner{width:16px;height:16px;border:2px solid currentColor;border-right-color:transparent;border-radius:50%;
+  display:inline-block;animation:spin .6s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+@media (prefers-reduced-motion: reduce){*{animation-duration:.01ms!important;transition-duration:.01ms!important}}
+
+/* ── premium finishing touches ── */
+html{scroll-behavior:smooth}
+*{scrollbar-width:thin;scrollbar-color:var(--line-2) transparent}
+*::-webkit-scrollbar{width:9px;height:9px}
+*::-webkit-scrollbar-thumb{background:var(--line-2);border-radius:99px;border:2px solid transparent;background-clip:content-box}
+*::-webkit-scrollbar-thumb:hover{background:var(--ink-3);background-clip:content-box}
+*::-webkit-scrollbar-track{background:transparent}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:6px}
+button,a,[role=button]{-webkit-tap-highlight-color:transparent}
+/* subtle entrance for tab pages */
+.fade{animation:pgIn .34s var(--ease)}
+@keyframes pgIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}

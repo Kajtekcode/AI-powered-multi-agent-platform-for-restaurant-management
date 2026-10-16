@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Restaurant Growth OS — Konfiguracja</title>
+<link rel="stylesheet" href="/static/design-system.css">
+<style>
+  body{display:flex;flex-direction:column;min-height:100dvh}
+  .screen{flex:1;display:flex;flex-direction:column;max-width:480px;width:100%;margin:0 auto}
+  .top{display:flex;align-items:center;justify-content:space-between;padding:var(--s-4) var(--s-5) 0}
+  .brand{display:flex;align-items:center;gap:9px}
+  .brand .mark{width:28px;height:28px;border-radius:7px;background:var(--ink);color:var(--bg);
+    display:flex;align-items:center;justify-content:center;font-size:14px}
+  .brand b{font-size:14.5px;font-weight:600;letter-spacing:-.01em}
+  .meta{font-family:var(--mono);font-size:11.5px;color:var(--ink-3);letter-spacing:.02em}
+  .content{flex:1;padding:var(--s-4) var(--s-5) 0;overflow:auto}
+  .segs{margin:var(--s-5) 0 var(--s-6)}
+  h1{margin-bottom:var(--s-3)}
+  .lede{color:var(--ink-2);font-size:var(--t-base);line-height:1.55;margin-bottom:var(--s-6);max-width:34ch}
+  .list{border-top:1px solid var(--line)}
+  .row{display:flex;align-items:center;gap:14px;padding:15px 2px;border-bottom:1px solid var(--line);
+    cursor:default;transition:opacity var(--t-fast) var(--ease)}
+  .idx{font-family:var(--mono);font-size:12px;color:var(--ink-3);width:24px;flex-shrink:0;font-weight:500}
+  .row.done .idx{color:var(--ok)}
+  .row.now .idx{color:var(--accent-ink)}
+  .name{font-size:var(--t-base);color:var(--ink-2);flex:1}
+  .row.now .name{color:var(--ink);font-weight:600}
+  .row.done .name{color:var(--ink)}
+  .row.now{cursor:pointer}
+  .footer{padding:var(--s-4) var(--s-5);border-top:1px solid var(--line)}
+  .stepdesc{font-size:var(--t-sm);color:var(--ink-3);margin-bottom:var(--s-3);min-height:1.2em}
+  .theme-toggle{background:none;border:1px solid var(--line-2);border-radius:var(--r-pill);width:34px;height:34px;
+    cursor:pointer;color:var(--ink-2);font-size:14px}
+  .logout{background:none;border:none;color:var(--ink-3);font-family:var(--mono);font-size:11.5px;cursor:pointer}
+</style>
+<link rel="manifest" href="/manifest.json">
+<meta name="theme-color" content="#0B0D11">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<link rel="apple-touch-icon" href="/static/icons/apple-touch-icon.png">
+</head>
+<body x-data="onboarding()" x-cloak>
+  <div class="screen">
+    <div class="top">
+      <div class="brand"><span class="mark">◍</span><b>Growth OS</b></div>
+      <div style="display:flex;align-items:center;gap:10px">
+        <span class="meta" x-text="'SETUP · ' + String(rank+1).padStart(2,'0') + '/06'"></span>
+        <button class="theme-toggle" @click="toggleTheme()" x-text="theme==='dark'?'☀':'☾'"></button>
+      </div>
+    </div>
+
+    <div class="content">
+      <div class="segs">
+        <template x-for="(s,i) in steps" :key="s.key">
+          <i :class="i < rank ? 'done' : (i===rank ? 'now' : '')"></i>
+        </template>
+      </div>
+
+      <div class="kicker mono" x-text="'// krok ' + String(rank+1).padStart(2,'0') + ' — ' + (current?.shortLabel||'')"></div>
+      <h1 style="margin-top:var(--s-3)" x-text="current?.title || ''"></h1>
+      <p class="lede" x-text="current?.lede || ''"></p>
+
+      <div class="list">
+        <template x-for="(s,i) in steps" :key="s.key">
+          <div class="row" :class="i<rank ? 'done' : (i===rank ? 'now' : '')"
+               @click="i===rank && act()">
+            <span class="idx" x-text="String(i+1).padStart(2,'0')"></span>
+            <span class="name" x-text="s.label"></span>
+            <span class="tag tag-ok" x-show="i<rank">gotowe</span>
+            <span class="tag tag-now" x-show="i===rank">teraz</span>
+          </div>
+        </template>
+      </div>
+    </div>
+
+    <div class="footer safe-bottom">
+      <div class="stepdesc" x-text="current?.hint || ''"></div>
+      <button class="btn btn-primary" @click="act()" :disabled="busy">
+        <span x-show="busy" class="spinner"></span>
+        <span x-text="busy ? '' : (current?.cta || 'Dalej')"></span>
+        <span x-show="!busy">→</span>
+      </button>
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-top:var(--s-3)">
+        <button class="logout" @click="logout()">wyloguj</button>
+        <button class="btn-ghost" style="height:auto;padding:4px 8px" x-show="current?.skippable"
+                @click="skip()">pomiń na razie</button>
+      </div>
+    </div>
+  </div>
+
+<script>
+function onboarding(){
+  return {
+    theme: document.documentElement.classList.contains('dark')?'dark':'light',
+    busy:false, rank:0,
+    steps:[
+      {key:'registered', label:'Konto', shortLabel:'konto', title:'Konto gotowe',
+       lede:'Świetnie. Połączmy teraz Twoją kasę GoPOS, żeby wciągnąć historię sprzedaży.',
+       cta:'Połącz GoPOS', hint:'Potrzebne dane dostępowe GoPOS (klucze API).'},
+      {key:'gopos_connected', label:'GoPOS', shortLabel:'gopos', title:'Połącz GoPOS',
+       lede:'Wpiszesz dane dostępowe, a my pobierzemy historię zamówień, pozycji i grafików.',
+       cta:'Połącz GoPOS', hint:'Tryb tylko do odczytu — niczego nie zmieniamy w kasie.'},
+      {key:'audit_done', label:'Audyt restauracji', shortLabel:'audyt', title:'Poznajmy Twoją restaurację',
+       lede:'Krótki wywiad z CEO Agentem. Buduje profil firmy, na którym opiera się każda rekomendacja.',
+       cta:'Rozpocznij audyt', hint:'Ok. 5 minut. Możesz przerwać i wrócić.', skippable:true},
+      {key:'research_done', label:'Analiza rynku', shortLabel:'rynek', title:'Analiza otoczenia',
+       lede:'Sprawdzamy konkurencję i obecność online, żeby rekomendacje były osadzone w realiach rynku.',
+       cta:'Uruchom analizę', hint:'Dzieje się automatycznie po audycie.'},
+      {key:'recipes_added', label:'Przepisy i koszty', shortLabel:'przepisy', title:'Dodaj przepisy',
+       lede:'Receptury pozwalają liczyć food cost i realne marże. Dodaj ręcznie lub ze zdjęcia menu.',
+       cta:'Dodaj przepisy', hint:'Wystarczy zacząć od kilku najważniejszych dań.', skippable:true},
+      {key:'briefing_active', label:'Poranny briefing', shortLabel:'briefing', title:'Wszystko gotowe',
+       lede:'Włącz poranny briefing — od jutra dostajesz konkretny plan działania każdego ranka.',
+       cta:'Włącz briefing i otwórz panel', hint:'Możesz to później zmienić w ustawieniach.'},
+    ],
+    get current(){ return this.steps[this.rank]; },
+
+    init(){
+      const saved=localStorage.getItem('rgos-theme');
+      if(saved) this.applyTheme(saved);
+      this.load();
+    },
+    applyTheme(t){ this.theme=t; document.documentElement.classList.remove('light','dark'); document.documentElement.classList.add(t); },
+    toggleTheme(){ const t=this.theme==='dark'?'light':'dark'; this.applyTheme(t); localStorage.setItem('rgos-theme',t); },
+
+    async load(){
+      try{
+        const r=await fetch('/api/onboarding/status');
+        if(r.status===401){ location.href='/login'; return; }
+        const d=await r.json();
+        this.rank = d.current_rank ?? 0;
+        if(d.complete){ location.href='/'; }
+      }catch(e){}
+    },
+
+    async act(){
+      const step=this.current.key;
+      // gopos connect + audit + recipes route to their own flows (built next)
+      if(step==='registered' || step==='gopos_connected'){ location.href='/onboarding/gopos'; return; }
+      if(step==='audit_done'){ location.href='/?tab=audit'; return; }
+      if(step==='recipes_added'){ location.href='/?tab=recipes'; return; }
+      // research + briefing advance via API
+      await this.advance(step);
+    },
+
+    async advance(step){
+      this.busy=true;
+      try{
+        const r=await fetch('/api/onboarding/advance',{method:'POST',
+          headers:{'Content-Type':'application/json'}, body:JSON.stringify({step})});
+        if(r.ok){ const d=await r.json();
+          if(d.onboarding_step==='briefing_active'){ location.href='/'; return; }
+          await this.load();
+        }
+      }catch(e){} finally{ this.busy=false; }
+    },
+
+    skip(){ /* advance past optional step without completing its action */ this.advance(this.current.key); },
+    async logout(){ await fetch('/api/auth/logout',{method:'POST'}); location.href='/login'; },
+  };
+}
+</script>
+<script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+<script>if('serviceWorker' in navigator){window.addEventListener('load',()=>navigator.serviceWorker.register('/sw.js').catch(()=>{}));}</script>
+</body>
+</html>
