@@ -42,16 +42,25 @@ def _signals(today: Dict, kpis: Dict, net: Optional[Dict]) -> List[str]:
 
 def build_today_briefing(repo, restaurant_name: str = "", force: bool = False) -> Dict:
     """Returns {greeting, message, actions[], signals[], generated_at}. Cached per day."""
+    today = repo.get_today_live() or {}
+    cur_rev = float(today.get("revenue") or 0)
     cache_key = f"briefing_today:{date.today().isoformat()}"
     if not force:
         cached = repo.get_setting(cache_key)
         if cached:
             try:
-                return json.loads(cached)
+                c = json.loads(cached)
+                gen_rev = float(c.get("_today_revenue", 0))
+                # The morning briefing is generated once and reused all day, but today's
+                # sales keep changing. Regenerate when revenue appears or shifts materially
+                # so the text never contradicts the live numbers (e.g. "utarg zero" at 1590 zł).
+                fresh = (gen_rev == 0 and cur_rev == 0) or \
+                        (gen_rev > 0 and abs(cur_rev - gen_rev) / max(gen_rev, 1.0) < 0.25)
+                if fresh:
+                    return c
             except Exception:
                 pass
 
-    today = repo.get_today_live() or {}
     kpis = {}
     try:
         kpis = repo.get_sales_summary(days=30) or {}
@@ -74,6 +83,7 @@ def build_today_briefing(repo, restaurant_name: str = "", force: bool = False) -
     result = _ai_briefing(restaurant_name, today, kpis, net, signals)
     result["signals"] = signals
     result["generated_at"] = date.today().isoformat()
+    result["_today_revenue"] = cur_rev
 
     try:
         repo.set_setting(cache_key, json.dumps(result, ensure_ascii=False))
@@ -158,14 +168,40 @@ def generate_goal_plan(repo, goal: Dict) -> List[str]:
     except Exception:
         pass
     ctx = "\n".join(f"- {k}: {v}" for k, v in profile.items())
+
+    # Real menu economics so the advisor grounds pricing/promo ideas in ACTUAL
+    # prices and margins (never invents e.g. "Plater 199 zł" when it costs 500).
+    menu_lines = []
+    try:
+        top = repo.get_top_items("revenue", 30, 10) or []
+        fc = repo.calculate_food_cost_pct(30) or {}
+        cost_by = {(d.get("dish_name") or "").lower(): d.get("cost_per_dish")
+                   for d in (fc.get("dish_breakdown") or [])}
+        for t in top:
+            name = t.get("item_name"); price = t.get("avg_price")
+            cost = cost_by.get((name or "").lower())
+            line = f"  - {name}: cena ~{round(price)} zł" if price else f"  - {name}"
+            if cost is not None and price:
+                line += f", food cost ~{round(cost)} zł, marża ~{round(price - cost)} zł"
+            else:
+                line += ", food cost NIEZNANY (brak receptury)"
+            menu_lines.append(line)
+    except Exception:
+        pass
+    menu_ctx = (("\n\nAKTUALNE MENU — RZECZYWISTE ceny i koszty (używaj TYCH liczb, NIE wymyślaj):\n"
+                 + "\n".join(menu_lines)) if menu_lines else "")
+
     system = (
-        "Jesteś praktycznym doradcą restauracji. Zaproponuj 3-5 KONKRETNYCH, wykonalnych "
-        "kroków, które realnie przybliżą właściciela do celu. Każdy krok to jedno krótkie "
-        "zdanie rozpoczynające się od czasownika (np. Dodaj, Przetestuj, Przeszkol). "
-        "Odnoś się do realiów tej restauracji. Zwróć WYŁĄCZNIE JSON: {\"steps\": [\"...\", ...]}."
+        "Jesteś praktycznym, inteligentnym doradcą restauracji. ZASADY TWARDE:\n"
+        "- Opieraj KAŻDĄ liczbę na realnych danych poniżej. NIGDY nie wymyślaj cen, kosztów ani promocji oderwanych od menu.\n"
+        "- Jeśli sugerujesz cenę lub promocję — WYJDŹ od rzeczywistej ceny dania i upewnij się, że nowa cena pokrywa food cost z rozsądną marżą. Jeśli się nie opłaca, NIE proponuj tego.\n"
+        "- Jeśli food cost dania jest NIEZNANY, nie proponuj zmian jego ceny — zaproponuj najpierw dodanie receptury.\n"
+        "- Rady mają być przemyślane i dopasowane do TEJ restauracji, nie ogólnikowe ani wymuszone.\n"
+        "Zaproponuj 3-5 KONKRETNYCH kroków (każdy zaczyna się od czasownika: Dodaj, Przetestuj, Podnieś…). "
+        "Zwróć WYŁĄCZNIE JSON: {\"steps\": [\"...\", ...]}."
     )
     user = (f"Cel: {title}\nMetryka: {metric_pl}\nWartość obecna: {current}\nCel docelowy: {target}\n\n"
-            f"Kontekst restauracji:\n{ctx}")
+            f"Kontekst restauracji:\n{ctx}{menu_ctx}")
     try:
         from openai import OpenAI
         client = OpenAI(api_key=settings.openai_api_key, base_url=settings.openai_base_url)

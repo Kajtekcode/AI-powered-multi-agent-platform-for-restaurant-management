@@ -66,6 +66,31 @@ async def get_invoice(invoice_id: str, repos: Repos = Depends(get_repos)):
     return inv
 
 
+@router.get("/{invoice_id}/image")
+async def invoice_image(invoice_id: str, repos: Repos = Depends(get_repos)):
+    """Serve the original invoice photo/scan — tenant-scoped (get_invoice already
+    filters by tenant) and confined to UPLOAD_DIR (no path traversal). PDFs are
+    rendered to a JPEG of the first page so they display in an <img>."""
+    from fastapi.responses import Response, FileResponse
+    img_path = repos.store.get_invoice_image_path(invoice_id)
+    if not img_path:
+        raise HTTPException(404, "Brak obrazu faktury.")
+    real = os.path.realpath(img_path)
+    base = os.path.realpath(UPLOAD_DIR)
+    if not (real == base or real.startswith(base + os.sep)) or not os.path.isfile(real):
+        raise HTTPException(404, "Plik nie istnieje.")
+    if real.lower().endswith(".pdf"):
+        try:
+            from app.core.invoices import _prepare_images
+            with open(real, "rb") as fh:
+                pages = _prepare_images(fh.read(), "application/pdf")
+            return Response(content=pages[0], media_type="image/jpeg",
+                            headers={"Cache-Control": "private, max-age=86400"})
+        except Exception:
+            raise HTTPException(415, "Nie udało się wyrenderować PDF.")
+    return FileResponse(real, headers={"Cache-Control": "private, max-age=86400"})
+
+
 @router.post("/{invoice_id}/paid")
 async def mark_paid(invoice_id: str, paid: bool = True, repos: Repos = Depends(get_repos)):
     if not repos.store.set_invoice_paid(invoice_id, paid):
@@ -83,10 +108,15 @@ async def delete_invoice(invoice_id: str, repos: Repos = Depends(get_repos)):
 async def costs_summary(days: int = 30, repos: Repos = Depends(get_repos)):
     """Company costs from invoices + real-vs-assumed food cost verification."""
     summary = repos.store.invoice_costs_summary(days=days)
-    # revenue for the same window
+    # revenue over the SAME period the invoices actually cover (so the food-cost %
+    # is comparable even when the invoices are older than `days`).
     revenue = 0.0
+    pf, pt = summary.get("period_from"), summary.get("period_to")
     try:
-        sales = repos.analytics.get_sales_summary(days=days)
+        if pf and pt:
+            sales = repos.analytics.get_sales_summary_range(pf, pt)
+        else:
+            sales = repos.analytics.get_sales_summary(days=days)
         revenue = sales.get("total_revenue", 0.0) or 0.0
     except Exception:
         pass
@@ -109,3 +139,15 @@ async def costs_summary(days: int = 30, repos: Repos = Depends(get_repos)):
     return {"summary": summary, "revenue": round(revenue, 2),
             "real_food_cost_pct": real_food_cost_pct, "assumed_food_cost_pct": assumed,
             "verdict": verdict}
+
+
+@router.get("/costs/price-signals")
+async def price_signals(repos: Repos = Depends(get_repos)):
+    """Price-watch from invoice history: what went up, and where you overpay."""
+    return repos.store.ingredient_price_signals()
+
+
+@router.get("/products/list")
+async def products_list(repos: Repos = Depends(get_repos)):
+    """All products tracked from invoices, with latest price, suppliers and trend."""
+    return {"products": repos.store.list_tracked_products()}

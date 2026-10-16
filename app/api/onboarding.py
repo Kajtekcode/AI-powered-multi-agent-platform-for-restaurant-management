@@ -38,8 +38,8 @@ STEP_META = {
         "title": "Research gotowy", "cta": "Dodaj przepisy",
         "desc": "Dodaj receptury, by liczyć food cost i marże."},
     OnboardingStep.recipes_added: {
-        "title": "Przepisy dodane", "cta": "Włącz briefing",
-        "desc": "Wszystko gotowe — włącz poranny briefing."},
+        "title": "Przepisy dodane", "cta": "Otwórz panel",
+        "desc": "Gotowe — codzienny plan czeka na ekranie „Dziś”."},
     OnboardingStep.briefing_active: {
         "title": "Gotowe!", "cta": "Otwórz dashboard",
         "desc": "Pełen system aktywny. Powodzenia!"},
@@ -67,14 +67,14 @@ def onboarding_status(tenant: Tenant = Depends(get_current_tenant)):
             "title": STEP_META[s]["title"], "desc": STEP_META[s]["desc"],
             "state": "done" if i <= completed_rank else ("current" if i == active_rank else "locked"),
         })
-    next_step = (ONBOARDING_ORDER[active_rank]
-                 if active_rank < len(ONBOARDING_ORDER) else None)
+    # STEP_META[X]["cta"] = the action that LEAVES state X (i.e. does the next step),
+    # so the call-to-action for what to do now keys off the current completed step.
     return {
         "current_step": cur.value,
         "completed_rank": completed_rank,
         "current_rank": active_rank,          # the step the wizard should highlight
         "complete": complete,
-        "next_cta": STEP_META[next_step]["cta"] if next_step else None,
+        "next_cta": None if complete else STEP_META[cur]["cta"],
         "steps": steps,
     }
 

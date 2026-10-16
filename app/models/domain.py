@@ -117,6 +117,9 @@ class ChatMessage(TenantMixin, Base):
     role: Mapped[str] = mapped_column(String(16))
     agent: Mapped[str] = mapped_column(String(20), default="ceo")
     content: Mapped[str] = mapped_column(Text)
+    # Conversations are grouped into threads; a new thread starts after a 12h gap
+    # (or a manual "new chat"). Old threads move to history instead of piling up.
+    thread_id: Mapped[Optional[str]] = mapped_column(String(36), index=True)
 
 
 class CompanyProfile(TenantMixin, Base):

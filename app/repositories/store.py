@@ -140,16 +140,88 @@ class TenantRepository:
     # Chat history                                                           #
     # ===================================================================== #
 
+    CHAT_THREAD_GAP_HOURS = 12  # idle gap after which a new conversation starts
+
+    def _latest_chat_message(self, session: str):
+        return self.db.execute(
+            self._scoped(m.ChatMessage).where(m.ChatMessage.session == session)
+            .order_by(m.ChatMessage.created_at.desc()).limit(1)
+        ).scalars().first()
+
+    def _active_thread_id(self, session: str):
+        """The thread the live chat should show — or None if the last convo is stale
+        (>12h) or the user asked for a fresh chat. In that case the old thread stays
+        in history and a new one starts on the next message."""
+        from datetime import datetime, timedelta
+        if self.get_setting(f"chat_force_new:{session}") == "1":
+            return None
+        latest = self._latest_chat_message(session)
+        if not latest or not latest.thread_id:
+            return None
+        if datetime.utcnow() - latest.created_at > timedelta(hours=self.CHAT_THREAD_GAP_HOURS):
+            return None
+        return latest.thread_id
+
     def save_chat_message(self, session: str, role: str, content: str, agent: str = "ceo"):
-        self._add(m.ChatMessage(session=session, role=role, content=content, agent=agent))
+        import uuid
+        tid = self._active_thread_id(session)
+        if tid is None:
+            tid = uuid.uuid4().hex[:32]
+            if self.get_setting(f"chat_force_new:{session}") == "1":
+                self.set_setting(f"chat_force_new:{session}", "0")
+        self._add(m.ChatMessage(session=session, role=role, content=content, agent=agent, thread_id=tid))
         self.db.commit()
 
     def get_chat_history(self, session: str, limit: int = 20) -> List[Dict]:
+        """Only the CURRENT conversation thread (older ones live in history)."""
+        tid = self._active_thread_id(session)
+        if tid is None:
+            return []
         stmt = (self._scoped(m.ChatMessage)
-                .where(m.ChatMessage.session == session)
+                .where(m.ChatMessage.session == session, m.ChatMessage.thread_id == tid)
                 .order_by(m.ChatMessage.created_at.desc()).limit(limit))
         rows = list(self.db.execute(stmt).scalars().all())
         rows.reverse()  # chronological
+        return [{"role": r.role, "content": r.content, "agent": r.agent} for r in rows]
+
+    def start_new_chat_thread(self, session: str):
+        """Manual 'new chat' — current conversation moves to history, view resets."""
+        self.set_setting(f"chat_force_new:{session}", "1")
+
+    def get_chat_threads(self, session: str, limit: int = 40) -> List[Dict]:
+        """Past conversations for the history list (newest first), minus the active one."""
+        rows = list(self.db.execute(
+            self._scoped(m.ChatMessage).where(m.ChatMessage.session == session)
+            .order_by(m.ChatMessage.created_at.desc())
+        ).scalars().all())
+        active = self._active_thread_id(session)
+        threads: Dict[str, Dict] = {}
+        for r in rows:  # newest → oldest
+            if not r.thread_id or r.thread_id == active:
+                continue
+            t = threads.setdefault(r.thread_id, {
+                "thread_id": r.thread_id, "count": 0,
+                "started_at": r.created_at, "ended_at": r.created_at, "title": None})
+            t["count"] += 1
+            t["started_at"] = r.created_at  # rows descend → last write = earliest
+            if r.role == "user":
+                t["title"] = r.content  # last user seen = earliest user message
+        out = []
+        for t in threads.values():
+            out.append({
+                "thread_id": t["thread_id"], "count": t["count"],
+                "title": (t["title"] or "Rozmowa").strip()[:80],
+                "started_at": t["started_at"].isoformat() if t["started_at"] else None,
+                "ended_at": t["ended_at"].isoformat() if t["ended_at"] else None,
+            })
+        out.sort(key=lambda x: x["ended_at"] or "", reverse=True)
+        return out[:limit]
+
+    def get_chat_thread_messages(self, session: str, thread_id: str, limit: int = 200) -> List[Dict]:
+        stmt = (self._scoped(m.ChatMessage)
+                .where(m.ChatMessage.session == session, m.ChatMessage.thread_id == thread_id)
+                .order_by(m.ChatMessage.created_at.asc()).limit(limit))
+        rows = self.db.execute(stmt).scalars().all()
         return [{"role": r.role, "content": r.content, "agent": r.agent} for r in rows]
 
     def clear_chat_history(self, session: str):
@@ -250,13 +322,134 @@ class TenantRepository:
         self.db.commit()
 
     def record_ingredient_price(self, ingredient, price, unit=None, supplier=None,
-                                source="invoice", recorded_at=None):
+                                source="invoice", recorded_at=None, category=None):
         from app.models import future as f
         from datetime import datetime as _dt
         self._add(f.IngredientPriceHistory(
             tenant_id=self.tenant_id, ingredient=ingredient, price=price, unit=unit,
-            supplier=supplier, source=source, recorded_at=recorded_at or _dt.utcnow()))
+            supplier=supplier, category=category, source=source,
+            recorded_at=recorded_at or _dt.utcnow()))
         self.db.commit()
+
+    def ingredient_price_signals(self, lookback_days: int = 180,
+                                 min_increase_pct: float = 8.0, max_items: int = 8) -> Dict:
+        """Read the price-history table to answer two owner questions:
+          - 'co podrożało?'  → increases: notable jump between the two most recent buys
+          - 'gdzie przepłacam?' → overpaying: same ingredient is cheaper at another supplier
+        Comparisons are unit-aware. Returns {'increases':[...], 'overpaying':[...]}."""
+        from app.models import future as f
+        from datetime import datetime as _dt, timedelta as _td
+        cutoff = _dt.utcnow() - _td(days=lookback_days)
+        rows = self.db.execute(
+            self._scoped(f.IngredientPriceHistory)
+            .where(f.IngredientPriceHistory.recorded_at >= cutoff)
+            .order_by(f.IngredientPriceHistory.recorded_at.asc())
+        ).scalars().all()
+
+        def _norm(s):
+            return " ".join((s or "").lower().split())
+
+        by_ing: Dict[str, list] = {}
+        for r in rows:
+            if r.price:
+                by_ing.setdefault(_norm(r.ingredient), []).append(r)
+
+        increases, overpaying = [], []
+        for recs in by_ing.values():
+            recs.sort(key=lambda x: x.recorded_at)
+            latest = recs[-1]
+            display, unit = latest.ingredient, latest.unit
+            # --- price increase: last two buys of the SAME unit AND SAME supplier,
+            # so 'podrożało' means your vendor raised the price (not a supplier switch,
+            # which is handled separately as overpaying) ---
+            same_unit = [x for x in recs
+                         if (x.unit or None) == (unit or None) and x.supplier == latest.supplier]
+            if len(same_unit) >= 2:
+                prev, last = same_unit[-2], same_unit[-1]
+                if prev.price and last.price and prev.price > 0:
+                    pct = round((last.price - prev.price) / prev.price * 100, 1)
+                    if pct >= min_increase_pct:
+                        increases.append({
+                            "ingredient": display, "unit": unit,
+                            "from": round(prev.price, 2), "to": round(last.price, 2), "pct": pct,
+                            "supplier": last.supplier,
+                            "prev_date": prev.recorded_at.date().isoformat() if prev.recorded_at else None,
+                            "last_date": last.recorded_at.date().isoformat() if last.recorded_at else None,
+                        })
+            # --- overpaying: cheapest current supplier vs the one you last bought from ---
+            by_sup: Dict[str, tuple] = {}
+            for x in recs:
+                if x.supplier and x.price and (x.unit or None) == (unit or None):
+                    if x.supplier not in by_sup or x.recorded_at > by_sup[x.supplier][1]:
+                        by_sup[x.supplier] = (x.price, x.recorded_at)
+            if len(by_sup) >= 2 and latest.supplier in by_sup:
+                cheapest_sup = min(by_sup, key=lambda s: by_sup[s][0])
+                cheapest_p = by_sup[cheapest_sup][0]
+                if (latest.supplier != cheapest_sup and latest.price
+                        and cheapest_p and latest.price > cheapest_p * 1.05):
+                    overpaying.append({
+                        "ingredient": display, "unit": unit,
+                        "you_pay": round(latest.price, 2), "you_supplier": latest.supplier,
+                        "cheaper": round(cheapest_p, 2), "cheaper_supplier": cheapest_sup,
+                        "save_pct": round((latest.price - cheapest_p) / latest.price * 100, 1),
+                    })
+        increases.sort(key=lambda x: -x["pct"])
+        overpaying.sort(key=lambda x: -x["save_pct"])
+        return {"increases": increases[:max_items], "overpaying": overpaying[:max_items]}
+
+    def list_tracked_products(self, lookback_days: int = 365, max_products: int = 300) -> List[Dict]:
+        """Every product seen on invoices, aggregated: latest price, suppliers, trend,
+        and a short price history (for the Produkty tab)."""
+        from app.models import future as f
+        from datetime import datetime as _dt, timedelta as _td
+        cutoff = _dt.utcnow() - _td(days=lookback_days)
+        rows = self.db.execute(
+            self._scoped(f.IngredientPriceHistory)
+            .where(f.IngredientPriceHistory.recorded_at >= cutoff)
+            .order_by(f.IngredientPriceHistory.recorded_at.asc())
+        ).scalars().all()
+
+        def _norm(s):
+            return " ".join((s or "").lower().split())
+
+        groups: Dict[str, list] = {}
+        for r in rows:
+            if r.price:
+                groups.setdefault(_norm(r.ingredient), []).append(r)
+
+        cat_labels = {"food": "Jedzenie", "drinks": "Napoje", "wine": "Wina",
+                      "alcohol": "Napoje alkoholowe", "chemistry": "Chemia",
+                      "media": "Media", "other": "Inne"}
+        out = []
+        for recs in groups.values():
+            recs.sort(key=lambda x: x.recorded_at)
+            latest, first = recs[-1], recs[0]
+            cat = next((x.category for x in reversed(recs) if x.category), None) or "other"
+            by_sup: Dict[str, dict] = {}
+            for x in recs:
+                if x.supplier and (x.supplier not in by_sup or x.recorded_at > by_sup[x.supplier]["date"]):
+                    by_sup[x.supplier] = {"price": x.price, "date": x.recorded_at}
+            cheapest = min(by_sup.items(), key=lambda kv: kv[1]["price"]) if by_sup else None
+            change_pct = (round((latest.price - first.price) / first.price * 100, 1)
+                          if first.price and len(recs) >= 2 else None)
+            out.append({
+                "name": latest.ingredient, "unit": latest.unit,
+                "category": cat, "category_label": cat_labels.get(cat, "Inne"),
+                "latest_price": round(latest.price, 2), "latest_supplier": latest.supplier,
+                "latest_date": latest.recorded_at.date().isoformat() if latest.recorded_at else None,
+                "first_price": round(first.price, 2), "change_pct": change_pct,
+                "buy_count": len(recs), "supplier_count": len(by_sup),
+                "cheapest_supplier": cheapest[0] if cheapest else None,
+                "cheapest_price": round(cheapest[1]["price"], 2) if cheapest else None,
+                "overpaying": bool(cheapest and latest.supplier and latest.supplier != cheapest[0]
+                                   and latest.price > cheapest[1]["price"] * 1.05),
+                "suppliers": [{"supplier": s, "price": round(v["price"], 2)}
+                              for s, v in sorted(by_sup.items(), key=lambda kv: kv[1]["price"])],
+                "history": [{"date": x.recorded_at.date().isoformat(), "price": round(x.price, 2),
+                             "supplier": x.supplier} for x in recs[-12:]],
+            })
+        out.sort(key=lambda p: p["latest_date"] or "", reverse=True)
+        return out[:max_products]
 
     def list_invoices(self, payment_status: Optional[str] = None) -> List[Dict]:
         from app.models import future as f
@@ -304,11 +497,33 @@ class TenantRepository:
 
     def delete_invoice(self, invoice_id: str):
         from app.models import future as f
+        import os as _os
+        # remove the stored scan file too (don't leave orphans on disk)
+        img = self.get_invoice_image_path(invoice_id)
+        # grab supplier + date so we can also purge the price-history this invoice fed
+        inv = self.db.execute(self._scoped(f.Invoice).where(f.Invoice.id == invoice_id)).scalar_one_or_none()
+        supplier = inv.supplier if inv else None
+        inv_date = inv.invoice_date if inv else None
         self.db.execute(delete(f.InvoiceItem).where(
             f.InvoiceItem.tenant_id == self.tenant_id, f.InvoiceItem.invoice_id == invoice_id))
         self.db.execute(delete(f.Invoice).where(
             f.Invoice.tenant_id == self.tenant_id, f.Invoice.id == invoice_id))
+        # price-history rows aren't linked by id; match this invoice's supplier + date
+        if supplier and inv_date:
+            day_lo = inv_date.replace(hour=0, minute=0, second=0, microsecond=0)
+            from datetime import timedelta as _td
+            self.db.execute(delete(f.IngredientPriceHistory).where(
+                f.IngredientPriceHistory.tenant_id == self.tenant_id,
+                f.IngredientPriceHistory.supplier == supplier,
+                f.IngredientPriceHistory.recorded_at >= day_lo,
+                f.IngredientPriceHistory.recorded_at < day_lo + _td(days=1)))
         self.db.commit()
+        if img:
+            try:
+                if _os.path.isfile(img):
+                    _os.remove(img)
+            except OSError:
+                pass
 
     def invoice_totals(self) -> Dict:
         """Summary for the cost/overview panel: unpaid count + amount + nearest due."""
@@ -322,23 +537,42 @@ class TenantRepository:
                 "nearest_due": nearest}
 
     def invoice_costs_summary(self, days: int = 30) -> Dict:
-        """Sum invoiced purchases by category over a period — basis for real cost
-        tracking and food-cost verification (food purchases vs revenue)."""
+        """Sum invoiced purchases by category — basis for real cost tracking and
+        food-cost verification (food purchases vs revenue). Uses the last `days`;
+        if there are no recent invoices but older ones exist, falls back to ALL
+        invoices so the breakdown isn't blank. Returns the actual period covered."""
         from app.models import future as f
         from datetime import datetime as _dt, timedelta as _td
         since = _dt.utcnow() - _td(days=days)
         rows = self.db.execute(
             self._scoped(f.Invoice).where(f.Invoice.invoice_date >= since)
         ).scalars().all()
+        fallback = False
+        if not rows:
+            rows = self.db.execute(self._scoped(f.Invoice)).scalars().all()
+            fallback = bool(rows)
         by_cat: Dict[str, float] = {}
         total = 0.0
+        dates = []
         for inv in rows:
             amt = inv.total or 0.0
             cat = inv.category or "other"
             by_cat[cat] = round(by_cat.get(cat, 0.0) + amt, 2)
             total += amt
+            if inv.invoice_date:
+                dates.append(inv.invoice_date)
         return {"days": days, "total": round(total, 2), "by_category": by_cat,
-                "invoice_count": len(rows), "food_purchases": round(by_cat.get("food", 0.0), 2)}
+                "invoice_count": len(rows), "food_purchases": round(by_cat.get("food", 0.0), 2),
+                "period_from": min(dates).date().isoformat() if dates else None,
+                "period_to": max(dates).date().isoformat() if dates else None,
+                "fallback_all": fallback}
+
+    def get_invoice_image_path(self, invoice_id: str) -> Optional[str]:
+        """Raw stored file path for the invoice scan — tenant-scoped, server-side only."""
+        from app.models import future as f
+        inv = self.db.execute(
+            self._scoped(f.Invoice).where(f.Invoice.id == invoice_id)).scalar_one_or_none()
+        return inv.image_url if inv else None
 
     def _invoice_dict(self, inv, item_count=0) -> Dict:
         return {
@@ -348,7 +582,9 @@ class TenantRepository:
             "total": inv.total, "total_net": inv.total_net, "currency": inv.currency or "PLN",
             "payment_method": inv.payment_method, "payment_status": inv.payment_status,
             "paid_at": inv.paid_at.isoformat() if inv.paid_at else None,
-            "category": inv.category, "image_url": inv.image_url, "status": inv.status,
+            "category": inv.category, "has_image": bool(inv.image_url),
+            "is_pdf": bool(inv.image_url and str(inv.image_url).lower().endswith(".pdf")),
+            "status": inv.status,
             "item_count": item_count,
         }
 
@@ -513,6 +749,32 @@ class TenantRepository:
         self.db.commit()
         return len(products)
 
+    def upsert_work_shifts(self, shifts) -> int:
+        """shifts: list of app.pos.base.POSWorkShift — RCP labor data."""
+        for s in shifts:
+            existing = self.db.execute(
+                self._scoped(m.WorkTime).where(m.WorkTime.gopos_id == s.external_id)
+            ).scalar_one_or_none()
+            if existing:
+                existing.employee_id = s.employee_external_id
+                existing.employee_name = s.employee_name
+                existing.workplace_name = s.workplace_name
+                existing.start_at = s.start_at
+                existing.end_at = s.end_at
+                existing.duration_minutes = s.duration_minutes
+                existing.hourly_rate = s.hourly_rate
+                existing.to_pay = s.to_pay
+                existing.status = s.status
+            else:
+                self._add(m.WorkTime(
+                    gopos_id=s.external_id, employee_id=s.employee_external_id,
+                    employee_name=s.employee_name, workplace_name=s.workplace_name,
+                    start_at=s.start_at, end_at=s.end_at,
+                    duration_minutes=s.duration_minutes, hourly_rate=s.hourly_rate,
+                    to_pay=s.to_pay, status=s.status))
+        self.db.commit()
+        return len(shifts)
+
     def resolve_item_categories(self) -> int:
         """Backfill OrderItem.category_name from the product catalog (dim_items)
         by matching OrderItem.item_id → DimItem.gopos_id. GoPOS order lines don't
@@ -595,6 +857,7 @@ class TenantRepository:
         {"key": "rent", "q": "Jaki jest miesięczny czynsz za lokal? (potrzebne do realnego progu rentowności)"},
         {"key": "fixed_costs_other", "q": "Jakie inne stałe koszty miesięczne ponosicie poza czynszem i wynagrodzeniami? (media, księgowość, leasing, ubezpieczenia, marketing)"},
         {"key": "staff_structure", "q": "Jak wygląda Wasz zespół? Ilu kucharzy, kelnerów, czy etaty czy zlecenia?"},
+        {"key": "labor_cost_monthly", "q": "Jaki jest Wasz łączny miesięczny koszt wynagrodzeń (brutto z ZUS)? Potrzebny do realnego zysku netto — jeśli nie liczycie godzin w GoPOS, użyję tej kwoty."},
         {"key": "financial_goal", "q": "Jaki jest Twój główny cel finansowy na najbliższe miesiące? (np. marża netto X%, przychód Y zł/mies., drugi lokal)"},
         {"key": "marketing_budget", "q": "Ile miesięcznie przeznaczasz (lub chciałbyś) na marketing i promocję?"},
         {"key": "marketing_channels", "q": "Z jakich kanałów promocji już korzystacie? (Instagram, Google, Facebook, pyszne.pl, współprace, nic)"},

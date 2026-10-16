@@ -57,6 +57,7 @@ class IngredientPriceHistory(TenantMixin, Base):
     price: Mapped[float] = mapped_column(Float)
     unit: Mapped[Optional[str]] = mapped_column(String(20))
     supplier: Mapped[Optional[str]] = mapped_column(String(200))
+    category: Mapped[Optional[str]] = mapped_column(String(20))  # food|drinks|alcohol|chemistry|media|other
     source: Mapped[str] = mapped_column(String(16), default="manual")  # invoice|manual
     recorded_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, index=True)
     __table_args__ = (Index("ix_priceh_tenant_ing", "tenant_id", "ingredient", "recorded_at"),)

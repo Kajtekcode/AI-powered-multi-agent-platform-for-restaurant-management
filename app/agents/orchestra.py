@@ -146,6 +146,7 @@ Polish language OK when user writes in Polish.""",
 
 def build_tools() -> List[Dict]:
     """Build all tool schemas available to agents."""
+    from app.core.data_query import schema_doc
     return [
         {
             "type": "function",
@@ -228,6 +229,67 @@ def build_tools() -> List[Dict]:
         {
             "type": "function",
             "function": {
+                "name": "preview_goal_spec",
+                "description": (
+                    "Measure a goal FROM A FLEXIBLE SPEC without creating it. ALWAYS call this first when the owner "
+                    "states a goal, to (a) translate their words into an exact measurable spec, (b) read back the "
+                    "current value, baseline and resolved target, and (c) check it is measurable. If 'measurable' is "
+                    "false, tell the owner exactly what data is missing and that the goal can't be activated yet. "
+                    "Use this for ANY timeframe/comparison: rok-do-roku, kwartał, dany rok, dowolny zakres. "
+                    "After the owner confirms, call create_goal_spec with the same arguments."),
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "title": {"type": "string", "description": "Short human title, e.g. 'Utarg lip–sier +30% r/r'"},
+                        "metric": {"type": "string", "enum": ["revenue", "net_profit", "net_margin_pct", "food_cost_pct", "avg_ticket", "orders", "labor_pct"]},
+                        "window": {
+                            "type": "object",
+                            "description": "Okres pomiaru.",
+                            "properties": {
+                                "type": {"type": "string", "enum": ["calendar", "to_date", "rolling", "custom"], "description": "calendar=pełny okres, to_date=od początku okresu do dziś, rolling=ostatnie N dni, custom=od/do"},
+                                "unit": {"type": "string", "enum": ["year", "quarter", "month", "days"]},
+                                "n": {"type": "integer", "description": "liczba dni dla rolling"},
+                                "from": {"type": "string", "description": "YYYY-MM-DD dla custom"},
+                                "to": {"type": "string", "description": "YYYY-MM-DD dla custom"},
+                            },
+                        },
+                        "comparison": {
+                            "type": "object",
+                            "properties": {
+                                "type": {"type": "string", "enum": ["absolute", "yoy", "prev_period", "baseline_snapshot"], "description": "absolute=wartość docelowa wprost; yoy=vs ten sam okres rok temu; prev_period=vs poprzedni okres tej samej długości"},
+                                "operator": {"type": "string", "enum": [">=", "<="]},
+                                "target": {"type": "number", "description": "liczba: albo wartość docelowa, albo % wzrostu (gdy target_kind=pct_growth)"},
+                                "target_kind": {"type": "string", "enum": ["value", "pct_growth"]},
+                            },
+                            "required": ["type", "operator", "target", "target_kind"],
+                        },
+                        "deadline": {"type": "string", "description": "YYYY-MM-DD"},
+                    },
+                    "required": ["title", "metric", "window", "comparison"],
+                },
+            },
+        },
+        {
+            "type": "function",
+            "function": {
+                "name": "create_goal_spec",
+                "description": "Activate a goal from a spec AFTER preview_goal_spec showed it is measurable and the owner confirmed the numbers. Same arguments as preview_goal_spec.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "title": {"type": "string"},
+                        "metric": {"type": "string", "enum": ["revenue", "net_profit", "net_margin_pct", "food_cost_pct", "avg_ticket", "orders", "labor_pct"]},
+                        "window": {"type": "object"},
+                        "comparison": {"type": "object"},
+                        "deadline": {"type": "string"},
+                    },
+                    "required": ["title", "metric", "window", "comparison"],
+                },
+            },
+        },
+        {
+            "type": "function",
+            "function": {
                 "name": "save_audit_report",
                 "description": "Save the final opening audit report + 90-day plan (markdown text) after completing the interview and web research. Shown on the dashboard.",
                 "parameters": {
@@ -243,6 +305,30 @@ def build_tools() -> List[Dict]:
                 "name": "get_today_status",
                 "description": "LIVE status of TODAY: revenue so far, orders, breakeven point (fixed costs + today's staffing, VAT-aware food cost), how far above/below breakeven, end-of-day projection, pace vs same weekday last week, today's top items. Use for 'jak idzie dzisiaj?', 'czy jesteśmy nad progiem?'. Call sync_recent_data first for freshest numbers.",
                 "parameters": {"type": "object", "properties": {}},
+            },
+        },
+        {
+            "type": "function",
+            "function": {
+                "name": "run_query",
+                "description": (
+                    "Zadaj WŁASNE pytanie SQL (SELECT) do bazy tej restauracji, gdy potrzebujesz "
+                    "korelacji lub liczby, której NIE MA w kontekście powyżej — np. sprzedaż wg dnia "
+                    "tygodnia/godziny, trend dania w czasie, marża dania vs cena składnika z faktur, "
+                    "porównanie okresów. Tylko ODCZYT. Odpytuj TYLKO widoki q_* (już zawężone do tej "
+                    "restauracji). Dialekt SQLite (użyj strftime('%w'/'%H'/'%Y-%m', kolumna_daty)). "
+                    "Widoki i kolumny:\n" + schema_doc() +
+                    "\nWskazówki: daty to closed_at (sprzedaż), invoice_date/recorded_at (faktury/ceny). "
+                    "%w: 0=niedziela..6=sobota. Łącz dania ze sprzedaży z recepturami po lower(nazwa). "
+                    "Zawsze filtruj status='CLOSED' dla realnej sprzedaży. Po wyniku ZINTERPRETUJ liczby po ludzku."
+                ),
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "sql": {"type": "string", "description": "Jedno zapytanie SELECT na widokach q_*."},
+                    },
+                    "required": ["sql"],
+                },
             },
         },
         {
@@ -572,6 +658,15 @@ def execute_tool(tool_name: str, arguments: Dict[str, Any], store) -> Any:
                 direction=arguments.get("direction", "increase"),
                 deadline=arguments.get("deadline"), notes=arguments.get("notes"))
             return {"created": True, "id": gid}
+        elif tool_name == "preview_goal_spec":
+            spec = {"metric": arguments.get("metric"), "window": arguments.get("window"),
+                    "comparison": arguments.get("comparison"), "deadline": arguments.get("deadline")}
+            return store.measure_spec(spec)
+        elif tool_name == "create_goal_spec":
+            spec = {"metric": arguments.get("metric"), "window": arguments.get("window"),
+                    "comparison": arguments.get("comparison"), "deadline": arguments.get("deadline")}
+            gid = store.create_spec_goal(arguments.get("title", "Cel"), spec)
+            return {"created": True, "id": gid, "measurement": store.measure_spec(spec)}
         elif tool_name == "get_goals":
             return store.get_goals(status="active")
         elif tool_name == "save_audit_report":
@@ -580,6 +675,8 @@ def execute_tool(tool_name: str, arguments: Dict[str, Any], store) -> Any:
             return {"saved": True}
         elif tool_name == "get_today_status":
             return store.get_today_live()
+        elif tool_name == "run_query":
+            return store.run_query(arguments.get("sql", ""))
         elif tool_name == "web_search":
             from app.core.web_tools import web_search
             return web_search(arguments["query"], max_results=arguments.get("max_results", 5))
@@ -599,47 +696,47 @@ def execute_tool(tool_name: str, arguments: Dict[str, Any], store) -> Any:
         elif tool_name == "get_labor_cost":
             if arguments.get("date_from") and arguments.get("date_to"):
                 return store.get_labor_cost_range(arguments["date_from"], arguments["date_to"])
-            return store.get_labor_cost(days=arguments.get("days", 30))
+            return store.get_labor_cost(days=(arguments.get("days") or 30))
         elif tool_name == "search_menu":
-            return store.search_menu(arguments["query"], limit=arguments.get("limit", 10))
+            return store.search_menu(arguments["query"], limit=(arguments.get("limit") or 10))
         elif tool_name == "get_product_catalog":
             return store.get_product_catalog(
-                search=arguments.get("search"), limit=arguments.get("limit", 100))
+                search=arguments.get("search"), limit=(arguments.get("limit") or 100))
         elif tool_name == "get_sales_summary_range":
             return store.get_sales_summary_range(arguments["date_from"], arguments["date_to"])
         elif tool_name == "get_monthly_revenue":
             return store.get_sales_by_month()
         elif tool_name == "get_top_items_range":
             return store.get_top_items_range(
-                arguments["date_from"], arguments["date_to"], limit=arguments.get("limit", 20))
+                arguments["date_from"], arguments["date_to"], limit=(arguments.get("limit") or 20))
         elif tool_name == "get_sales_summary":
-            return store.get_sales_summary(days=arguments.get("days", 30))
+            return store.get_sales_summary(days=(arguments.get("days") or 30))
         elif tool_name == "get_sales_by_day":
-            return store.get_sales_by_day(days=arguments.get("days", 30))
+            return store.get_sales_by_day(days=(arguments.get("days") or 30))
         elif tool_name == "get_sales_by_hour":
-            return store.get_sales_by_hour(days=arguments.get("days", 14))
+            return store.get_sales_by_hour(days=(arguments.get("days") or 14))
         elif tool_name == "get_top_items":
             return store.get_top_items(
                 metric=arguments.get("metric", "revenue"),
                 days=arguments.get("days"),
-                limit=arguments.get("limit", 15),
+                limit=(arguments.get("limit") or 15),
             )
         elif tool_name == "get_sales_by_channel":
-            return store.get_sales_by_direction(days=arguments.get("days", 30))
+            return store.get_sales_by_direction(days=(arguments.get("days") or 30))
         elif tool_name == "get_employee_performance":
-            return store.get_employee_performance(days=arguments.get("days", 30))
+            return store.get_employee_performance(days=(arguments.get("days") or 30))
         elif tool_name == "get_day_of_week_performance":
-            return store.get_day_of_week_performance(days=arguments.get("days", 90))
+            return store.get_day_of_week_performance(days=(arguments.get("days") or 90))
         elif tool_name == "get_recipe":
             return store.get_recipe(arguments["dish_name"])
         elif tool_name == "calculate_dish_food_cost":
             return store.calculate_dish_food_cost(arguments["dish_name"])
         elif tool_name == "calculate_food_cost_pct":
-            return store.calculate_food_cost_pct(days=arguments.get("days", 30))
+            return store.calculate_food_cost_pct(days=(arguments.get("days") or 30))
         elif tool_name == "get_overhead_costs":
             return store.get_overhead_costs()
         elif tool_name == "calculate_real_net_profit":
-            return store.calculate_real_net_profit(days=arguments.get("days", 30))
+            return store.calculate_real_net_profit(days=(arguments.get("days") or 30))
         elif tool_name == "get_data_status":
             return store.get_data_status()
         elif tool_name == "get_all_recipes":
@@ -683,6 +780,11 @@ def _date_context() -> str:
         "Dla pytań o konkretny dzień/okres użyj get_sales_summary_range z date_from/date_to "
         "(dla jednego dnia date_from = date_to). Jeśli zwróci order_count=0, powiedz wprost, "
         "że dla TEGO dnia brak danych — nie zgaduj.",
+        "ŻELAZNE REGUŁY OKIEN CZASOWYCH (błędna liczba = utrata zaufania właściciela):",
+        "1. Cytując JAKĄKOLWIEK sumę za okres, podaj zakres dat w nawiasie, np. „34 254 zł (12–18.07)”.",
+        "2. „Miniony/zeszły tydzień” = poprzedni PEŁNY pon–niedz. Okres pon–dziś to „ten tydzień” — nigdy nie nazywaj go minionym.",
+        "3. Do podsumowań okresów NIE wliczaj dzisiejszego, niepełnego dnia (chyba że pytanie dotyczy właśnie dziś).",
+        "4. Dzień z 0 zamówień w sezonie niskim to zwykle dzień zamknięty — zaznacz to zamiast raportować „spadek do zera”.",
     ]
     return "\n".join(lines)
 
@@ -762,6 +864,179 @@ def run_agent(
 
 
 # ---------------------------------------------------------------------------
+# Business snapshot — the real-time picture the CEO reasons on
+# ---------------------------------------------------------------------------
+
+_PL_DOW = ["niedziela", "poniedziałek", "wtorek", "środa", "czwartek", "piątek", "sobota"]
+
+
+def _business_snapshot(store) -> str:
+    """A real-time, high-signal picture of the whole business so the CEO advisor
+    reasons on FACTS (and explicit data gaps) instead of pulling 30-day numbers
+    piecemeal per question. This is what makes the advice actually useful."""
+    blocks: List[str] = []
+    gaps: List[str] = []
+
+    try:
+        profile = store.get_profile() or {}
+    except Exception:
+        profile = {}
+    if profile:
+        pl = [f"  - {k}: {v}" for k, v in profile.items() if str(v or "").strip()]
+        if pl:
+            blocks.append("PROFIL FIRMY (z audytu — kontekst, którego POS nie zna):\n" + "\n".join(pl[:25]))
+
+    nums: List[str] = []
+    try:
+        s = store.get_sales_summary(30) or {}
+        chg = None
+        try:
+            prev = store.get_sales_summary_prev(30) or {}
+            pr = prev.get("total_revenue") or 0
+            if pr > 0:
+                chg = round((s.get("total_revenue", 0) - pr) / pr * 100, 1)
+        except Exception:
+            pass
+        rl = f"  - Przychód 30 dni: {s.get('total_revenue')} zł"
+        if chg is not None:
+            rl += f" ({'+' if chg >= 0 else ''}{chg}% vs poprzednie 30 dni)"
+        nums.append(rl)
+        nums.append(f"  - Zamówienia: {s.get('order_count')}, średni rachunek: {s.get('avg_ticket')} zł")
+    except Exception:
+        pass
+
+    try:
+        np = store.calculate_real_net_profit(30) or {}
+        nl = f"  - Zysk netto 30 dni: {np.get('net_profit')} zł (marża {np.get('net_margin_pct')}%)"
+        if np.get("complete") is False:
+            nl += " — UWAGA: NIEPEŁNY"
+        nums.append(nl)
+        if np.get("overhead") is not None:
+            nums.append(f"  - Koszty stałe (mies.): {np.get('overhead')} zł")
+    except Exception:
+        pass
+
+    try:
+        fc = store.calculate_food_cost_pct(30) or {}
+        dwr = fc.get("dishes_with_recipes") or 0
+        nums.append(f"  - Food cost: {fc.get('food_cost_pct')}% (receptury tylko dla {dwr} dań)")
+        if dwr < 5:
+            gaps.append("receptury większości dań — food cost i marża są niewiarygodne")
+    except Exception:
+        pass
+
+    try:
+        lb = store.get_labor_cost(30) or {}
+        if lb.get("has_data"):
+            nums.append(f"  - Koszty pracy: {lb.get('labor_pct')}% przychodu")
+        else:
+            nums.append("  - Koszty pracy: BRAK DANYCH")
+            gaps.append("koszty pracy / RCP — bez nich zysk netto jest zawyżony")
+    except Exception:
+        pass
+
+    if nums:
+        blocks.append("LICZBY NA ŻYWO (30 dni):\n" + "\n".join(nums))
+
+    try:
+        dow = [d for d in (store.get_day_of_week_performance(90) or []) if (d.get("avg_day_revenue") or 0) > 0]
+        if dow:
+            b = max(dow, key=lambda d: d["avg_day_revenue"])
+            w = min(dow, key=lambda d: d["avg_day_revenue"])
+            blocks.append(
+                f"WZORCE: najmocniejszy dzień — {_PL_DOW[b['dow']]} (~{round(b['avg_day_revenue'])} zł/dzień), "
+                f"najsłabszy — {_PL_DOW[w['dow']]} (~{round(w['avg_day_revenue'])} zł/dzień).")
+    except Exception:
+        pass
+
+    try:
+        top = store.get_top_items("revenue", 30, 6) or []
+        if top:
+            fcb = {}
+            try:
+                fcd = store.calculate_food_cost_pct(30) or {}
+                fcb = {(d.get("dish_name") or "").lower(): d.get("cost_per_dish") for d in (fcd.get("dish_breakdown") or [])}
+            except Exception:
+                pass
+            tlines = []
+            for t in top:
+                nm, pr = t.get("item_name"), t.get("avg_price")
+                cost = fcb.get((nm or "").lower())
+                s = f"{nm} (cena ~{round(pr)} zł" if pr else f"{nm} ("
+                if cost is not None and pr:
+                    s += f", food cost ~{round(cost)} zł, marża ~{round(pr - cost)} zł)"
+                else:
+                    s += ", food cost nieznany)"
+                tlines.append(s)
+            blocks.append("TOP DANIA (30 dni, RZECZYWISTE ceny — używaj ich, nie wymyślaj): " + "; ".join(tlines))
+    except Exception:
+        pass
+
+    try:
+        td = store.get_today_live() or {}
+        if td and td.get("order_count") is not None:
+            be = (td.get("breakeven") or {}).get("vs_breakeven")
+            t = f"DZIŚ: utarg {td.get('revenue')} zł, {td.get('order_count')} zamówień"
+            if be is not None:
+                t += f" — {'nad progiem o' if be >= 0 else 'do progu brakuje'} {abs(round(be))} zł"
+            blocks.append(t)
+    except Exception:
+        pass
+
+    try:
+        ic = store.invoice_costs_summary(days=30)
+        if ic.get("invoice_count"):
+            bycat = ic.get("by_category") or {}
+            catnames = {"food": "jedzenie", "drinks": "napoje", "wine": "wino",
+                        "alcohol": "alkohol", "chemistry": "chemia", "media": "media", "other": "inne"}
+            parts = [f"{catnames.get(k, k)} {round(v)} zł" for k, v in
+                     sorted(bycat.items(), key=lambda kv: -kv[1])]
+            period = (f"{ic.get('period_from')}–{ic.get('period_to')}"
+                      if ic.get("period_from") else "ostatnie 30 dni")
+            line = f"ZAKUPY Z FAKTUR ({period}): " + ", ".join(parts) + "."
+            food = ic.get("food_purchases") or 0
+            if food:
+                rev = 0.0
+                try:
+                    if ic.get("period_from"):
+                        rev = (store.get_sales_summary_range(ic["period_from"], ic["period_to"]) or {}).get("total_revenue", 0) or 0
+                    assumed = (store.calculate_food_cost_pct(days=30) or {}).get("food_cost_pct")
+                    if rev:
+                        real = round(food / rev * 100, 1)
+                        line += (f" REALNY food cost (tylko jedzenie / przychód okresu) = {real}%"
+                                 + (f" vs zakładany z receptur {assumed}%" if assumed else "")
+                                 + ". Jeśli realny znacząco > zakładany — ostrzeż o przepłacaniu/stratach; jeśli <, faktury mogą być niekompletne.")
+                except Exception:
+                    pass
+            blocks.append(line)
+    except Exception:
+        pass
+
+    try:
+        sig = store.ingredient_price_signals()
+        plines = []
+        for s in (sig.get("increases") or [])[:5]:
+            plines.append(f"{s['ingredient']}: {s['from']}→{s['to']} zł"
+                          f"{('/'+s['unit']) if s.get('unit') else ''} (+{s['pct']}%"
+                          f"{', '+s['supplier'] if s.get('supplier') else ''}) — PODROŻAŁO")
+        for s in (sig.get("overpaying") or [])[:5]:
+            plines.append(f"{s['ingredient']}: płacisz {s['you_pay']} zł u {s['you_supplier']}, "
+                          f"taniej {s['cheaper']} zł u {s['cheaper_supplier']} (−{s['save_pct']}%) — PRZEPŁACASZ")
+        if plines:
+            blocks.append("CENY ZAKUPÓW (z faktur — proaktywnie ostrzegaj właściciela o tych pozycjach):\n  - "
+                          + "\n  - ".join(plines))
+    except Exception:
+        pass
+
+    if gaps:
+        blocks.append(
+            "LUKI DANYCH — czego NIE wiesz. Proś o uzupełnienie zanim doradzisz na ich temat; "
+            "NIE zgaduj i NIE podawaj liczb, których nie masz:\n  - " + "\n  - ".join(dict.fromkeys(gaps)))
+
+    return "\n\n".join(blocks)
+
+
+# ---------------------------------------------------------------------------
 # CEO Orchestrator — calls sub-agents and synthesizes
 # ---------------------------------------------------------------------------
 
@@ -799,20 +1074,54 @@ def run_ceo_agent(
         lines = [f"- [{m['category']}] {m['content']}" for m in reversed(memories)]
         memory_block = "\nLONG-TERM MEMORY (facts you saved in past conversations — USE them to personalize advice):\n" + "\n".join(lines)
 
-    context = f"""
-Current data context:
-- Orders in DB: {data_status.get('order_count', 0):,}
-- Data range: {data_status.get('data_from', 'N/A')} → {data_status.get('data_to', 'N/A')}
-- Recipes loaded: {data_status.get('recipe_count', 0)}
-- Overhead categories: {data_status.get('overhead_count', 0)}
-- Reference 'now': {data_status.get('reference_now', 'N/A')}{identity}
-{memory_block}
+    # Active goals → context. The advisor's PRIMARY job is to move these, with the
+    # owner's north-star (realny zysk netto) as the frame every recommendation ties back to.
+    goals_block = ""
+    try:
+        _goals = store.get_goals(status="active")
+    except Exception:
+        _goals = []
+    if _goals:
+        glines = []
+        for g in _goals[:8]:
+            glines.append(
+                f"- {g.get('title')} [{g.get('metric')}]: teraz {g.get('current_value')}, "
+                f"cel {g.get('target_value')}, tempo: {g.get('pace')}"
+            )
+        goals_block = (
+            "\nACTIVE GOALS — these are the owner's targets and your PRIMARY objective is to MOVE them:\n"
+            + "\n".join(glines)
+            + "\nNORTH STAR: realny zysk netto = przychód − food cost − koszty pracy − koszty stałe. "
+            "Every recommendation must (a) name which goal/lever it advances and (b) estimate the impact in PLN. "
+            "If food cost or labor data is missing, getting that data is the highest-impact move — say so plainly "
+            "instead of optimizing on incomplete numbers."
+        )
 
-You have access to tools to pull any data you need.
-When the question involves financial metrics, ALWAYS call calculate_real_net_profit.
-When the question involves menu items, ALWAYS call get_top_items AND calculate_food_cost_pct.
-MEMORY: when the user shares a preference, goal, decision, or important business fact —
-call save_memory IMMEDIATELY (don't ask permission). This is how you get smarter over time.
+    # Full real-time picture of the business — this is the CEO's eyes on everything.
+    try:
+        snapshot = _business_snapshot(store)
+    except Exception as e:
+        logger.warning(f"business snapshot failed: {e}")
+        snapshot = ""
+
+    context = f"""
+=== AKTUALNY OBRAZ BIZNESU (na żywo — to już wiesz, nie musisz tego dociągać) ===
+- Zamówienia w bazie: {data_status.get('order_count', 0):,} · zakres: {data_status.get('data_from', 'N/A')} → {data_status.get('data_to', 'N/A')} · „teraz": {data_status.get('reference_now', 'N/A')}{identity}
+
+{snapshot}
+{memory_block}
+{goals_block}
+
+=== JAK MASZ DZIAŁAĆ ===
+- Masz powyżej pełny, aktualny obraz firmy — OPIERAJ rady na nim. Narzędzia wołaj tylko po GŁĘBSZY detal (konkretne danie, inny okres), nie po podstawy.
+- KORELACJE I ANALIZY: gdy pytanie wymaga liczby/zależności, której NIE MA w kontekście (np. sprzedaż wg dnia tygodnia/godziny, trend dania w czasie, marża dania vs cena składnika z faktur, porównanie okresów, wpływ ceny na sprzedaż) — użyj narzędzia `run_query` i napisz własne SELECT na widokach q_*. Nie zgaduj takich liczb — POLICZ je. Po wyniku podaj wniosek po ludzku z konkretną rekomendacją.
+- NIGDY nie podawaj liczby, której nie masz. Jeśli czegoś brak (patrz LUKI DANYCH), powiedz wprost, że tego potrzebujesz — nie zgaduj i nie udawaj.
+- CENY I PROMOCJE: opieraj się na RZECZYWISTYCH cenach z TOP DANIA. Każda proponowana cena/promocja musi wychodzić od realnej ceny dania i pokrywać food cost z rozsądną marżą — jeśli się nie opłaca, nie proponuj jej. Nie znasz food costu dania? Najpierw poproś o recepturę, nie zmieniaj ceny w ciemno. Rady mają być przemyślane, nie wymuszone.
+- Każda rada ma: (a) wskazać, który CEL / którą dźwignię zysku rusza, i (b) oszacować wpływ w zł.
+- USTALANIE CELU: gdy właściciel chce ustawić/zmienić cel — NAJPIERW przetłumacz jego słowa na dokładną specyfikację i wywołaj preview_goal_spec (np. „utarg w tym roku +30% r/r" → metric=revenue, window={{type:to_date,unit:year}}, comparison={{type:yoy,operator:'>=',target:30,target_kind:pct_growth}}). Odczytaj mu PO LUDZKU co to znaczy w liczbach (obecnie X, baza rok temu Y, cel Z, termin) i poproś o potwierdzenie. Jeśli measurable=false — powiedz wprost, czego brakuje i że celu NIE DA SIĘ aktywować, dopóki danych nie uzupełni. Dopiero po „tak" wywołaj create_goal_spec.
+- Bądź konkretny i krótki. Zero ogólników typu „przeanalizuj swoje dane" — TY masz dane, więc TY mów co zrobić.
+- Gdy użytkownik dzieli się preferencją/decyzją/faktem o firmie — wywołaj save_memory od razu (bez pytania).
+- Świeże dane: pytania o DZIŚ/wczoraj → najpierw sync_recent_data, potem licz.
 """
 
     messages: List[Dict] = []
@@ -932,8 +1241,19 @@ Now do ALL of the following, in order:
    (3) Plan 90-dniowy — marketing,
    (4) Plan 90-dniowy — finanse i rentowność,
    (5) Rekomendowane cele.
-3. Call create_goal for each measurable goal (net_margin_pct, food_cost_pct,
-   avg_ticket, revenue, labor_pct) you recommend.
+3. Turn the recommended goals into TRACKED goals. Choose the right tool per goal:
+   - For a steady-state RATIO or fixed target (np. food_cost_pct ≤ 32, labor_pct ≤ 28,
+     avg_ticket = 200, net_margin_pct ≥ 12): call create_goal.
+   - For ANYTHING with a timeframe or a comparison — a season, a month range, a quarter,
+     or "+X% rok-do-roku / vs poprzedni okres" — you MUST call create_goal_spec, NOT create_goal.
+     A "+30%" target is a percentage GROWTH, never an absolute value of 30.
+     Example: owner's financial_goal "utarg w lipcu i sierpniu +30% vs zeszły rok" →
+       create_goal_spec(title="Utarg lipiec–sierpień +30% r/r", metric="revenue",
+         window={{type:"custom", from:"2026-07-01", to:"2026-08-31"}},
+         comparison={{type:"yoy", operator:">=", target:30, target_kind:"pct_growth"}},
+         deadline="2026-08-31")
+   Read the owner's financial_goal carefully and pick the matching tool. Never encode a
+   percentage-growth goal as a flat create_goal target.
 Use their REAL data. Be concrete and specific to this restaurant.
 """
         messages = [{"role": "user", "content": "Audyt zakończony — przygotuj raport, research i cele."}]
@@ -946,12 +1266,14 @@ Use their REAL data. Be concrete and specific to this restaurant.
         final = f"{report_intro}\n\n{report_resp}"
         store.save_chat_message(session, "assistant", final, "audit")
 
-        # Advance onboarding (audit done)
+        # Advance onboarding. The audit already runs the market/competitor research
+        # inline (web_search → "Analiza rynku" in the report), so we advance straight
+        # past research_done — there is no separate research action for the user to take.
         try:
             from app.models.tenant import OnboardingStep, step_rank, Tenant
             t = store.store.db.query(Tenant).filter_by(id=tenant_id).first()
-            if t and step_rank(t.onboarding_step) < step_rank(OnboardingStep.audit_done):
-                t.onboarding_step = OnboardingStep.audit_done
+            if t and step_rank(t.onboarding_step) < step_rank(OnboardingStep.research_done):
+                t.onboarding_step = OnboardingStep.research_done
                 store.store.db.commit()
         except Exception as e:
             logger.warning(f"could not advance onboarding after audit: {e}")
@@ -1039,10 +1361,13 @@ Focus on:
 4. Specific actions for today and this week
 Be concrete with numbers. End with 5 prioritized actions."""
 
-    financial_q = "Analyze last 7 days financial performance. What are the key trends and risks? Focus on net profit margin and food cost %."
-    menu_q = "Which menu items are underperforming? Which should be featured? Calculate food cost % and identify the top 3 margin improvement opportunities."
-    growth_q = "What are the top 3 revenue opportunities for the next 7 days? Look at channel performance, day-of-week patterns, and pricing opportunities."
-    ops_q = "Analyze staffing efficiency and hourly patterns. What operational improvements would have the highest impact this week?"
+    financial_q = ("Przeanalizuj wyniki finansowe ZESZŁEGO PEŁNEGO TYGODNIA (pon–niedz — dokładne daty masz w kontekście czasowym; "
+                   "użyj get_sales_summary_range) i porównaj z tygodniem wcześniejszym. Ten tydzień (pon–dziś) omów OSOBNO i wyraźnie tak nazwij. "
+                   "Przy każdej kwocie podaj zakres dat. Skup się na marży zysku netto i food cost %. Odpowiadaj PO POLSKU, konkretnie, z liczbami w zł.")
+    menu_q = "Które pozycje menu radzą sobie słabo, a które warto wyróżnić? Policz food cost % i wskaż 3 największe okazje do poprawy marży. Odpowiadaj PO POLSKU, konkretnie, z liczbami w zł."
+    growth_q = ("Jakie są 3 największe okazje na wzrost przychodu w najbliższych 7 dniach? Spójrz na kanały sprzedaży, wzorce dni tygodnia "
+                "(zeszły pełny tydzień pon–niedz jako baza, daty z kontekstu czasowego) i ceny. Odpowiadaj PO POLSKU, konkretnie, z liczbami w zł.")
+    ops_q = "Przeanalizuj efektywność obsady i wzorce godzinowe. Które usprawnienia operacyjne dadzą największy efekt w tym tygodniu? Odpowiadaj PO POLSKU, konkretnie."
 
     sections = {
         "financial": run_financial_agent(financial_q),
@@ -1052,21 +1377,22 @@ Be concrete with numbers. End with 5 prioritized actions."""
     }
 
     # CEO synthesizes all sections
-    synthesis_prompt = f"""Based on these specialist reports, create an executive summary with 5 concrete priority actions:
+    synthesis_prompt = f"""Na podstawie raportów specjalistów napisz PO POLSKU zwięzłe podsumowanie zarządcze i 5 konkretnych priorytetów na ten tydzień:
 
-FINANCIAL ANALYST:
+ANALITYK FINANSOWY:
 {sections['financial'][:800]}
 
-MENU & COSTING:
+MENU I KOSZTY:
 {sections['menu'][:800]}
 
-GROWTH & MARKETING:
+WZROST I MARKETING:
 {sections['growth'][:800]}
 
-OPERATIONS:
+OPERACJE:
 {sections['operations'][:800]}
 
-Write a 3-paragraph executive summary + numbered list of 5 priority actions for this week."""
+Napisz PO POLSKU: 2-3 akapity podsumowania + ponumerowaną listę 5 priorytetowych działań na ten tydzień. Konkretnie, z liczbami w zł.
+Przy każdej kwocie za okres podaj zakres dat (np. „46 tys. zł, 6–12.07”). „Miniony tydzień” = wyłącznie poprzedni pełny pon–niedz."""
 
     summary = run_ceo_agent(synthesis_prompt)
 

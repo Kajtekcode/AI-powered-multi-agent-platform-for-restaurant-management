@@ -226,13 +226,17 @@ Trendy gastronomiczne 2026 i presja kosztowa (składniki) — z wyników.
 ## Wnioski i rekomendacje
 3-5 konkretnych ruchów, każdy z uzasadnieniem z analizy powyżej.
 
-Na samym KOŃCU dodaj blok z propozycjami mierzalnych celów w formacie JSON (dokładnie taki blok, nic po nim):
+Na samym KOŃCU dodaj blok z propozycjami celów w formacie JSON (dokładnie taki blok, nic po nim):
 ```goals
 [
-  {{"title": "krótki opis celu", "metric": "avg_ticket|revenue|net_margin_pct|food_cost_pct|labor_pct", "target_value": liczba, "direction": "increase|decrease", "rationale": "dlaczego, 1 zdanie z analizy"}}
+  {{"title": "konkretny cel z mierzalnym efektem w tytule", "metric": "avg_ticket|revenue|net_margin_pct|food_cost_pct|labor_pct|manual", "target_value": liczba_lub_null, "direction": "increase|decrease", "rationale": "dlaczego, 1 zdanie z analizy"}}
 ]
 ```
-Zaproponuj 3-5 celów wynikających z ANALIZY (nie z profilu). target_value to liczba (zł lub %)."""
+ZASADY DOBIERANIA CELÓW (to jest kluczowe — cele mają być SENSOWNE, nie na siłę):
+- Użyj metryki finansowej (avg_ticket, revenue, net_margin_pct, food_cost_pct, labor_pct) TYLKO gdy cel to NAPRAWDĘ ta liczba ze sprzedaży. Wtedy target_value musi być REALISTYCZNY i we właściwej jednostce: revenue = zł/miesiąc (np. 90000), avg_ticket = zł na rachunek (np. 180), *_pct = procenty (np. 30). NIGDY nie dawaj revenue=15 ani innych bezsensownych liczb.
+- Dla celów JAKOŚCIOWYCH / marketingowych (widoczność w Google/rankingach, liczba opinii, obecność online, wydarzenia, kampanie, social media) użyj metric="manual" i WPISZ KONKRETNY MIERZALNY EFEKT W TYTUŁ (np. „Zdobyć 50 nowych opinii Google do końca sierpnia", „Wejść do top 10 wyników 'owoce morza Gdańsk'"). Dla manual ustaw target_value=null — taki cel właściciel odhacza ręcznie.
+- Nie wciskaj celu marketingowego w „revenue" — to daje bezsensowne liczby. Lepszy manual z konkretnym celem w tytule.
+Zaproponuj 3-5 celów wynikających z ANALIZY (nie z profilu)."""
 
         out = self._llm(system, user)
         if not out:
@@ -259,13 +263,19 @@ def _extract_goals(text: str):
                     metric = g.get("metric", "manual")
                     if metric not in valid_metrics:
                         metric = "manual"
+                    # Financial goals need a real number; qualitative (manual) goals are
+                    # tracked by hand — the measurable target lives in the title.
+                    tv = None
                     try:
                         tv = float(g.get("target_value"))
                     except (TypeError, ValueError):
-                        continue
+                        tv = None
+                    if metric != "manual" and tv is None:
+                        # a financial metric with no usable number → treat as qualitative
+                        metric = "manual"
                     goals.append({
                         "title": str(g.get("title", "")).strip()[:200] or "Cel",
-                        "metric": metric, "target_value": tv,
+                        "metric": metric, "target_value": (tv if metric != "manual" else None),
                         "direction": "decrease" if g.get("direction") == "decrease" else "increase",
                         "rationale": str(g.get("rationale", "")).strip()[:300],
                     })

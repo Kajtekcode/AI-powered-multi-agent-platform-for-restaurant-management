@@ -31,66 +31,58 @@ EXTRACTION_PROMPT = (
     '  "currency": "PLN",\n'
     '  "total": liczba (kwota brutto całej faktury),\n'
     '  "total_net": liczba lub null,\n'
-    '  "category": "JEDZENIE|NAPOJE|NAPOJE ALKOHOLOWE|CHEMIA|INNE (dominująca kategoria pozycji)",\n'
+    '  "category": "JEDZENIE|NAPOJE|WINO|NAPOJE ALKOHOLOWE|CHEMIA|MEDIA|INNE (dominująca kategoria pozycji)",\n'
     '  "items": [\n'
     "    {\n"
-    '      "name": "nazwa składnika (np. Kukurydza kolby 2,5kg Oerlemans)",\n'
-    '      "unit": "kg|l|szt|zgrz|kart",\n'
-    '      "net_price": cena NETTO za jednostkę miary (kolumna \'Cena netto\'),\n'
+    '      "name": "nazwa produktu (np. Ostrygi Bretania N2)",\n'
+    '      "unit": "jednostka BAZOWA do której sprowadzasz cenę: szt|kg|l",\n'
+    '      "pack_size": liczba jednostek bazowych w opakowaniu zbiorczym (np. karton 36 ostryg → 36; zgrzewka 6×1,5l → 9 (litry); worek 2,5 kg → 2.5 (kg)); jeśli sprzedawane luzem na szt/kg/l → 1,\n'
+    '      "pack_label": "krótki opis opakowania jeśli dotyczy (np. \'karton 36 szt\') lub null",\n'
+    '      "net_price": cena NETTO za JEDNĄ jednostkę BAZOWĄ (1 szt / 1 kg / 1 l) — jeśli cena z faktury dotyczy opakowania, PODZIEL ją przez pack_size,\n'
     '      "vat_percent": stawka VAT w % (np. 5, 8, 23),\n'
-    '      "unit_price": cena BRUTTO za jednostkę (net_price + net_price*vat_percent/100),\n'
+    '      "unit_price": cena BRUTTO za jednostkę bazową (net_price + net_price*vat_percent/100),\n'
     '      "total_price": wartość pozycji brutto lub null,\n'
-    '      "category": "JEDZENIE|NAPOJE|NAPOJE ALKOHOLOWE|CHEMIA|INNE"\n'
+    '      "category": "JEDZENIE|NAPOJE|WINO|NAPOJE ALKOHOLOWE|CHEMIA|MEDIA|INNE"\n'
     "    }\n"
     "  ]\n"
     "}\n"
     "ZASADY:\n"
-    "- net_price to cena za JEDNĄ jednostkę miary — IGNORUJ ilość (np. 2 szt.) i wartości sumaryczne pozycji.\n"
+    "- CENA ZA JEDNOSTKĘ BAZOWĄ (najważniejsze): zawsze sprowadzaj cenę do JEDNEJ sztuki / 1 kg / 1 l, żeby ceny od różnych dostawców były porównywalne. "
+    "Jeśli produkt jest w opakowaniu zbiorczym, a liczbę sztuk/wagę widać na fakturze albo w nazwie (np. 'Ostrygi karton 36 szt' za 36 zł → net_price=1,00 zł/szt; 'Woda 6×1,5 l' za 18 zł → net_price=2,00 zł/l), policz net_price = cena_opakowania / pack_size i ustaw unit na jednostkę bazową (szt/kg/l).\n"
+    "- IGNORUJ kupioną ilość pozycji (np. 2 kartony) i wartości sumaryczne — interesuje nas cena jednostkowa za 1 szt/kg/l.\n"
     "- Kwoty jako liczby z kropką dziesiętną, bez walut w polach liczbowych.\n"
-    "- Kategorie pozycji: JEDZENIE (produkty spożywcze: mięso, ryby, warzywa, mąka, sery), "
-    "NAPOJE (bezalkoholowe: woda, soki, lemoniada), NAPOJE ALKOHOLOWE (wino, piwo, wódka), "
-    "CHEMIA (środki czystości), INNE (opakowania, usługi).\n"
+    "- Kategorie pozycji: JEDZENIE (produkty spożywcze: mięso, ryby, owoce morza, warzywa, mąka, sery), "
+    "NAPOJE (bezalkoholowe: woda, soki, lemoniada, kawa, herbata), "
+    "WINO (wszystkie wina: czerwone, białe, różowe, musujące, prosecco, szampan — także w BIB/bag-in-box), "
+    "NAPOJE ALKOHOLOWE (alkohol INNY niż wino: piwo, wódka, whisky, gin, likiery, drinki), "
+    "CHEMIA (środki czystości, detergenty, worki, rękawiczki), MEDIA (prąd/energia elektryczna, gaz, woda z wodociągów, "
+    "internet, telefon, wywóz śmieci, czynsz), INNE (opakowania, usługi, pozostałe).\n"
     "- Kategoria całej faktury = dominująca kategoria pozycji.\n"
-    "- Pomijaj pozycje nie będące składnikami (rabaty, usługi transportowe).\n"
+    "- Pomijaj tylko rabaty i pozycje czysto rozliczeniowe. Pozycje typu 'energia elektryczna', 'opłata abonamentowa', "
+    "'opłata handlowa' za media ZACHOWAJ (kategoria MEDIA).\n"
     "- Nie zgaduj — jeśli pola nie ma na obrazie, użyj null. Przy niepewnych pozycjach pomiń je, "
     "ale zachowaj poprawną strukturę JSON."
 )
 
 # Map Polish invoice categories → internal cost buckets used for food-cost math.
 CATEGORY_MAP = {
-    "JEDZENIE": "food", "NAPOJE": "drinks", "NAPOJE ALKOHOLOWE": "alcohol",
-    "CHEMIA": "chemistry", "INNE": "other",
+    "JEDZENIE": "food", "NAPOJE": "drinks", "WINO": "wine", "NAPOJE ALKOHOLOWE": "alcohol",
+    "CHEMIA": "chemistry", "MEDIA": "media", "INNE": "other",
 }
 
 
-def _prepare_image(image_bytes: bytes, media_type: str) -> bytes:
-    """Convert ANY uploaded image/PDF into a clean JPEG the vision model accepts.
-    Handles iPhone HEIC, PNG/WEBP, oversized photos, and the first page of PDFs.
-    Returns JPEG bytes. Raises with a clear message if it truly can't decode."""
-    import io
-    # PDF → render first page to an image (needs PyMuPDF)
-    if media_type == "application/pdf" or image_bytes[:5] == b"%PDF-":
-        try:
-            import fitz  # PyMuPDF
-            doc = fitz.open(stream=image_bytes, filetype="pdf")
-            page = doc.load_page(0)
-            pix = page.get_pixmap(dpi=170)
-            image_bytes = pix.tobytes("png")
-            media_type = "image/png"
-        except Exception as e:
-            raise RuntimeError(
-                "Nie potrafię odczytać PDF — zrób zdjęcie faktury (JPG/PNG) "
-                f"albo zainstaluj PyMuPDF. ({e})"
-            )
+MAX_PDF_PAGES = 8  # cap so a huge multi-page PDF doesn't blow up the vision payload
 
+
+def _normalize_jpeg(image_bytes: bytes) -> bytes:
+    """One raster image → clean RGB JPEG (≤2200px). Handles HEIC/PNG/WEBP via Pillow."""
+    import io
     from PIL import Image
-    # enable HEIC/HEIF (iPhone) if the optional lib is present
     try:
         import pillow_heif  # type: ignore
         pillow_heif.register_heif_opener()
     except Exception:
         pass
-
     try:
         img = Image.open(io.BytesIO(image_bytes))
         img.load()
@@ -100,43 +92,71 @@ def _prepare_image(image_bytes: bytes, media_type: str) -> bytes:
             "ustaw w aparacie format „Najbardziej zgodny” (JPEG) lub zrób zrzut ekranu. "
             f"({e})"
         )
-
-    # flatten transparency, normalize colour, cap dimensions to keep payload sane
-    if img.mode in ("RGBA", "P", "LA"):
-        img = img.convert("RGB")
-    elif img.mode != "RGB":
+    if img.mode != "RGB":
         img = img.convert("RGB")
     max_dim = 2200
     if max(img.size) > max_dim:
         ratio = max_dim / max(img.size)
         img = img.resize((int(img.size[0] * ratio), int(img.size[1] * ratio)))
-
     out = io.BytesIO()
     img.save(out, format="JPEG", quality=85)
     return out.getvalue()
 
 
+def _prepare_images(image_bytes: bytes, media_type: str) -> list:
+    """Convert ANY uploaded image/PDF into a LIST of clean JPEGs the vision model accepts —
+    one per page for PDFs (so multi-page invoices are read in full), one for a single image.
+    Handles iPhone HEIC, PNG/WEBP and oversized photos. Raises with a clear message on failure."""
+    # PDF → render EVERY page to an image (needs PyMuPDF)
+    if media_type == "application/pdf" or image_bytes[:5] == b"%PDF-":
+        try:
+            import fitz  # PyMuPDF
+            doc = fitz.open(stream=image_bytes, filetype="pdf")
+            pages = []
+            for i in range(min(doc.page_count, MAX_PDF_PAGES)):
+                pix = doc.load_page(i).get_pixmap(dpi=170)
+                pages.append(_normalize_jpeg(pix.tobytes("png")))
+            if pages:
+                return pages
+        except Exception as e:
+            raise RuntimeError(
+                "Nie potrafię odczytać PDF — zrób zdjęcie faktury (JPG/PNG) "
+                f"albo zainstaluj PyMuPDF. ({e})"
+            )
+    # single raster image
+    return [_normalize_jpeg(image_bytes)]
+
+
+def _prepare_image(image_bytes: bytes, media_type: str) -> bytes:
+    """Back-compat: first page only."""
+    return _prepare_images(image_bytes, media_type)[0]
+
+
 def _default_extract(image_bytes: bytes, media_type: str) -> Dict:
-    """Real vision extraction via the configured vision model (OpenAI-compatible)."""
+    """Real vision extraction via the configured vision model (OpenAI-compatible).
+    Sends ALL pages of a multi-page invoice so items from every page are merged."""
     from app.core.config import settings
     if not settings.llm_configured:
         raise RuntimeError("LLM not configured — cannot run OCR")
     from openai import OpenAI
 
-    jpeg = _prepare_image(image_bytes, media_type)
-    b64 = base64.b64encode(jpeg).decode("ascii")
+    jpegs = _prepare_images(image_bytes, media_type)
+    prompt = EXTRACTION_PROMPT
+    if len(jpegs) > 1:
+        prompt += (f"\n\nUWAGA: ta faktura ma {len(jpegs)} STRON (kolejne obrazy poniżej). "
+                   "Połącz pozycje ze WSZYSTKICH stron w JEDEN JSON; sumy i numer faktury "
+                   "weź z całości dokumentu (zwykle z ostatniej strony).")
+    content = [{"type": "text", "text": prompt}]
+    for j in jpegs:
+        b64 = base64.b64encode(j).decode("ascii")
+        content.append({"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{b64}"}})
+
     client = OpenAI(api_key=settings.openai_api_key, base_url=settings.openai_base_url)
     model = settings.openai_vision_model or settings.openai_model
     resp = client.chat.completions.create(
         model=model,
-        messages=[{
-            "role": "user",
-            "content": [
-                {"type": "text", "text": EXTRACTION_PROMPT},
-                {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{b64}"}},
-            ],
-        }],
-        temperature=0.1, max_tokens=1800,
+        messages=[{"role": "user", "content": content}],
+        temperature=0.1, max_tokens=2400,
     )
     raw = (resp.choices[0].message.content or "").replace("```json", "").replace("```", "").strip()
     return json.loads(raw)
@@ -227,6 +247,7 @@ def extract_and_store(repo, image_bytes: bytes, media_type: str,
             repo.record_ingredient_price(
                 ingredient=name, price=price_for_history, unit=unit, supplier=supplier,
                 source="invoice", recorded_at=inv_date or datetime.utcnow(),
+                category=item_cat,
             )
 
     invoice["item_count"] = len([i for i in items if (i.get("name") or "").strip()])

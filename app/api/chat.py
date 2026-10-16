@@ -67,14 +67,28 @@ async def chat_message(req: ChatRequest, tenant: Tenant = Depends(get_current_te
 
 @router.get("/history")
 async def get_history(session: str = "web", limit: int = 30, repos: Repos = Depends(get_repos)):
-    """Persistent chat history — survives page reloads."""
+    """The CURRENT conversation thread — survives reloads, resets after 12h idle."""
     return repos.store.get_chat_history(session, limit=limit)
 
 
 @router.delete("/history")
 async def clear_history(session: str = "web", repos: Repos = Depends(get_repos)):
-    repos.store.clear_chat_history(session)
-    return {"status": "cleared", "session": session}
+    """'New chat' — archives the current conversation to history and starts fresh
+    (nothing is lost; the user can reopen it under Historia)."""
+    repos.store.start_new_chat_thread(session)
+    return {"status": "archived", "session": session}
+
+
+@router.get("/threads")
+async def list_threads(session: str = "web", limit: int = 40, repos: Repos = Depends(get_repos)):
+    """Past conversations the user can reopen (newest first)."""
+    return repos.store.get_chat_threads(session, limit=limit)
+
+
+@router.get("/threads/{thread_id}")
+async def get_thread(thread_id: str, session: str = "web", repos: Repos = Depends(get_repos)):
+    """Read a specific past conversation."""
+    return repos.store.get_chat_thread_messages(session, thread_id)
 
 
 @router.get("/memories")
@@ -101,7 +115,10 @@ async def audit_message(req: ChatRequest, tenant: Tenant = Depends(get_current_t
     """Send an answer during the audit interview."""
     from app.agents.orchestra import run_audit_interview
     try:
-        return run_audit_interview(req.message, session="web", tenant_id=tenant.id)
+        # Keep the audit interview in its own session so its Q&A doesn't pollute the
+        # advisor chat (Doradca loads session="web"). The advisor still gets the full
+        # audit profile via the business snapshot, not the raw transcript.
+        return run_audit_interview(req.message, session="audit", tenant_id=tenant.id)
     except Exception as e:
         logger.error(f"Audit error: {e}")
         raise HTTPException(status_code=500, detail=str(e))
@@ -124,11 +141,15 @@ async def get_profile(repos: Repos = Depends(get_repos)):
 @router.post("/briefing")
 async def generate_briefing(_: BriefingRequest = BriefingRequest(),
                             tenant: Tenant = Depends(get_current_tenant)):
-    """Generate a comprehensive daily briefing from all agents."""
+    """Generate a comprehensive daily briefing from all agents (the 'Narada doradców')."""
+    from app.core.tenant_context import tenant_scope
     try:
-        return generate_daily_briefing()
+        # The sub-agents resolve their tenant from the context var, which isn't set
+        # on the request thread — scope it explicitly and pass the id through.
+        with tenant_scope(tenant.id):
+            return generate_daily_briefing(tenant.id)
     except Exception as e:
-        logger.error(f"Briefing error: {e}")
+        logger.exception(f"Briefing error: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 

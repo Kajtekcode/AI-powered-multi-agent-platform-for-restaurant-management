@@ -42,4 +42,5 @@ async def sync_status(repos: Repos = Depends(get_repos)):
     """Sync status + data stats for this tenant."""
     status = repos.analytics.get_data_status(repos.store)
     status["last_sync"] = repos.store.get_sync_state("last_sync")
+    status["connection_error"] = repos.store.get_sync_state("connection_error") or None
     return status

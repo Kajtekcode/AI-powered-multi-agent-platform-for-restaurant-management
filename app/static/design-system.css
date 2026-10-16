@@ -6,52 +6,56 @@
 
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;450;500;600;700;800&display=swap');
 
-/* ── DARK is the default (premium, deep). Light mode via html.light ── */
+/* ── MISE „Bursztyn i Bałtyk” — DARK default: warm charcoal like an evening room.
+      Amber = action/attention · sea = money up · coral = down/alert. ── */
 :root{
-  /* surfaces — deep near-black with layered cards */
-  --bg:#0A0A0C; --surface:#141417; --surface-2:#1B1B20;
-  /* ink */
-  --ink:#FAFAFA; --ink-2:#A1A1AA; --ink-3:#6B6B73;
-  /* lines — barely-there */
-  --line:rgba(255,255,255,.07); --line-2:rgba(255,255,255,.12);
-  /* accent — restrained violet */
-  --accent:#A855F7; --accent-2:#8B5CF6; --accent-soft:rgba(168,85,247,.13); --accent-ink:#C9A2F9;
-  /* semantic (tuned for dark) */
-  --ok:#34D399; --ok-soft:rgba(52,211,153,.13); --ok-ink:#6EE7B7;
-  --warn:#FBBF24; --warn-soft:rgba(251,191,36,.13); --warn-ink:#FCD34D;
-  --danger:#F87171; --danger-soft:rgba(248,113,113,.13); --danger-ink:#FCA5A5;
+  /* surfaces — warm charcoal, layered like wood in low light */
+  --bg:#131110; --surface:#1C1916; --surface-2:#24201A;
+  /* ink — bone white with warm undertone */
+  --ink:#F2EDE4; --ink-2:#B7AE9F; --ink-3:#7C7466;
+  /* lines — barely-there, warm */
+  --line:rgba(242,237,228,.07); --line-2:rgba(242,237,228,.13);
+  /* accent — amber (the only action colour) */
+  --accent:#E8A33D; --accent-2:#F4BC63; --accent-soft:rgba(232,163,61,.13); --accent-ink:#F4BC63;
+  --on-accent:#1A1610;
+  /* semantic: sea green = profit/good · coral = loss/alert */
+  --ok:#45C4A0; --ok-soft:rgba(69,196,160,.13); --ok-ink:#74D9BC;
+  --warn:#EDB458; --warn-soft:rgba(237,180,88,.13); --warn-ink:#F3C77E;
+  --danger:#E06A55; --danger-soft:rgba(224,106,85,.14); --danger-ink:#F0937F;
   /* radii — generous, modern */
   --r-sm:10px; --r:14px; --r-lg:20px; --r-pill:999px;
-  /* type — grotesk everywhere; tight display */
-  --font-display:"Inter",-apple-system,BlinkMacSystemFont,system-ui,sans-serif;
+  /* type — serif display for titles & money; grotesk for everything else */
+  --font-display:ui-serif,"New York",Georgia,"Times New Roman",serif;
   --font:"Inter",-apple-system,BlinkMacSystemFont,"Segoe UI",system-ui,sans-serif;
-  --mono:"SF Mono",ui-monospace,"JetBrains Mono",Menlo,Consolas,monospace;
+  /* "mono" = Inter with tabular figures (number columns align via .num) */
+  --mono:"Inter",-apple-system,BlinkMacSystemFont,system-ui,sans-serif;
   /* type scale */
   --t-xs:12px; --t-sm:13px; --t-base:15px; --t-md:17px; --t-lg:22px; --t-xl:30px; --t-2xl:40px;
   /* spacing (4px base) — generous */
   --s-1:4px; --s-2:8px; --s-3:12px; --s-4:16px; --s-5:24px; --s-6:32px; --s-7:48px; --s-8:72px;
   /* motion */
   --ease:cubic-bezier(.22,1,.36,1); --t-fast:160ms; --t-mid:280ms;
-  /* elevation — soft glow on dark */
+  /* elevation — soft warm glow on dark */
   --shadow:0 1px 2px rgba(0,0,0,.4), 0 12px 32px -8px rgba(0,0,0,.5);
   --shadow-sm:0 1px 2px rgba(0,0,0,.3), 0 4px 16px -6px rgba(0,0,0,.4);
-  --glow:0 0 0 1px rgba(168,85,247,.18), 0 8px 32px -8px rgba(168,85,247,.22);
-  --page:#0A0A0C;
+  --glow:0 0 0 1px rgba(232,163,61,.18), 0 8px 32px -8px rgba(232,163,61,.20);
+  --page:#131110;
 }
 
-/* ── LIGHT mode (opt-in via html.light) ── */
+/* ── LIGHT mode „piasek” — warm sand, not hospital white (opt-in via html.light) ── */
 html.light{
-  --bg:#FBFAFB; --surface:#FFFFFF; --surface-2:#F4F4F6;
-  --ink:#18181B; --ink-2:#5E5E66; --ink-3:#9C9CA5;
-  --line:rgba(24,24,27,.08); --line-2:rgba(24,24,27,.14);
-  --accent:#8B5CF6; --accent-2:#7C3AED; --accent-soft:rgba(139,92,246,.10); --accent-ink:#6D28D9;
-  --ok:#0E9D6E; --ok-soft:#E2F4EC; --ok-ink:#0A6B4C;
-  --warn:#BA7517; --warn-soft:#FAEEDA; --warn-ink:#854F0B;
-  --danger:#D8453A; --danger-soft:#FBEAE8; --danger-ink:#A3271E;
-  --shadow:0 1px 2px rgba(24,24,27,.04), 0 10px 28px -8px rgba(24,24,27,.10);
-  --shadow-sm:0 1px 2px rgba(24,24,27,.05), 0 2px 10px -3px rgba(24,24,27,.06);
-  --glow:0 0 0 1px rgba(139,92,246,.16), 0 8px 28px -10px rgba(139,92,246,.18);
-  --page:#FBFAFB;
+  --bg:#F5F1E9; --surface:#FDFBF6; --surface-2:#EDE7DB;
+  --ink:#26221C; --ink-2:#6E6555; --ink-3:#9A9080;
+  --line:rgba(38,34,28,.08); --line-2:rgba(38,34,28,.15);
+  --accent:#B87B1D; --accent-2:#9A6314; --accent-soft:rgba(184,123,29,.12); --accent-ink:#8A5A10;
+  --on-accent:#FDFBF6;
+  --ok:#1F8E71; --ok-soft:#DFF0E9; --ok-ink:#14664F;
+  --warn:#A9731A; --warn-soft:#F6ECD9; --warn-ink:#7D540E;
+  --danger:#C74E3B; --danger-soft:#F8E7E3; --danger-ink:#99321F;
+  --shadow:0 1px 2px rgba(38,34,28,.05), 0 10px 28px -8px rgba(38,34,28,.11);
+  --shadow-sm:0 1px 2px rgba(38,34,28,.05), 0 2px 10px -3px rgba(38,34,28,.07);
+  --glow:0 0 0 1px rgba(184,123,29,.16), 0 8px 28px -10px rgba(184,123,29,.16);
+  --page:#F5F1E9;
 }
 
 /* html.dark is the default look; class kept for the toggle to force it back from light */
@@ -61,7 +65,7 @@ html.dark{ /* uses :root defaults */ }
 *{box-sizing:border-box;margin:0;padding:0;-webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility}
 html,body{height:100%}
 body{font-family:var(--font);background:var(--bg);color:var(--ink);font-size:var(--t-base);line-height:1.5;
-  background-image:radial-gradient(1200px 600px at 50% -10%, rgba(168,85,247,.06), transparent 70%);
+  background-image:radial-gradient(1100px 520px at 50% -16%, rgba(232,163,61,.030), transparent 72%);
   background-attachment:fixed}
 html.light body{background-image:none}
 ::selection{background:var(--accent-soft);color:var(--accent-ink)}
@@ -72,7 +76,7 @@ html.light body{background-image:none}
 h1{font-family:var(--font-display);font-size:32px;line-height:1.1;letter-spacing:-.02em;font-weight:600}
 h2{font-family:var(--font-display);font-size:23px;line-height:1.18;letter-spacing:-.015em;font-weight:600}
 h3{font-size:var(--t-md);line-height:1.3;letter-spacing:-.01em;font-weight:600}
-.kicker{font-family:var(--mono);font-size:var(--t-xs);letter-spacing:.08em;text-transform:uppercase;color:var(--accent-ink)}
+.kicker{font-family:var(--font);font-size:var(--t-xs);font-weight:600;letter-spacing:0;color:var(--accent-ink)}
 .muted{color:var(--ink-2)}
 .hint{color:var(--ink-3);font-size:var(--t-sm)}
 
@@ -84,8 +88,9 @@ h3{font-size:var(--t-md);line-height:1.3;letter-spacing:-.01em;font-weight:600}
 .btn:hover{background:var(--surface-2)}
 .btn:active{transform:scale(.985)}
 .btn:disabled{opacity:.5;cursor:not-allowed}
-.btn-primary{background:var(--accent);border-color:transparent;color:#fff;height:52px;font-size:var(--t-md);width:100%}
+.btn-primary{background:var(--accent);border-color:transparent;color:#1A1610;height:52px;font-size:var(--t-md);width:100%;font-weight:600}
 .btn-primary:hover{background:var(--accent-2)}
+html.light .btn-primary{color:#FDFBF6}
 .btn-ghost{background:none;border-color:transparent;color:var(--ink-3);font-family:var(--mono);font-size:var(--t-sm)}
 .btn-ghost:hover{background:var(--surface-2);color:var(--ink-2)}
 

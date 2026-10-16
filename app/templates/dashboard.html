@@ -3,13 +3,13 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Restaurant Growth OS</title>
+  <title>Mise</title>
 
   <script defer src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/marked@9.0.0/marked.min.js"></script>
 
-  <link rel="stylesheet" href="/static/design-system.css">
+  <link rel="stylesheet" href="/static/design-system.css?v=3">
 
   <style>
     /* ─────────────────────────── TOKENS (mapped to Direction C) ─────────────────────────── */
@@ -40,6 +40,8 @@
     /* Direction C: no serif display face; system font everywhere, mono for data */
     .serif { font-family: var(--font-display); letter-spacing: -.01em; font-weight: 560; }
     .num   { font-family: var(--mono); font-variant-numeric: tabular-nums; letter-spacing: 0; }
+    /* Money gets the serif — hero figures only; table columns stay grotesk+tabular */
+    .kpi-value { font-family: var(--font-display); letter-spacing: -.01em; }
 
     [x-cloak] { display: none !important; }
 
@@ -51,22 +53,22 @@
     .sk { background: linear-gradient(90deg, var(--surface-2) 25%, var(--card-2) 37%, var(--surface-2) 63%);
       background-size: 400% 100%; animation: shimmer 1.4s ease infinite; border-radius: 8px; display: block; }
     @keyframes shimmer { 0% { background-position: 100% 0; } 100% { background-position: 0 0; } }
-    .section-label { font-size: 11.5px; font-weight: 600; letter-spacing: .1em; text-transform: uppercase;
-      color: var(--text-3); margin: 26px 2px 13px; }
+    .section-label { font-size: 13px; font-weight: 600; letter-spacing: -.005em;
+      color: var(--text-2); margin: 28px 2px 14px; }
     .today-hero { position: relative; margin-bottom: 14px; padding: 26px 28px; border-radius: var(--r-lg, 20px);
       border: 1px solid var(--border); background: var(--card); box-shadow: var(--shadow-sm); overflow: hidden; }
-    .today-hero-num { font-family: var(--mono); font-variant-numeric: tabular-nums; font-size: 52px; font-weight: 600;
-      letter-spacing: -.045em; line-height: .96; margin-top: 10px; }
+    .today-hero-num { font-family: var(--font-display); font-variant-numeric: tabular-nums; font-size: 52px; font-weight: 600;
+      letter-spacing: -.02em; line-height: .98; margin-top: 10px; }
     .today-hero-sub { font-size: 13px; color: var(--text-3); margin-top: 10px; }
     .be { margin-top: 24px; }
     .be-bar { height: 10px; border-radius: 6px; background: var(--surface-2); overflow: hidden; }
-    .be-bar i { display: block; height: 100%; border-radius: 6px; transition: width .7s var(--ease); }
+    .be-bar > div, .be-bar i { display: block; height: 100%; border-radius: 6px; transition: width .7s var(--ease); }
     .be-row { display: flex; justify-content: space-between; align-items: center; margin-top: 12px; gap: 12px; flex-wrap: wrap; }
     .be-status { font-size: 13px; font-weight: 600; padding: 5px 13px; border-radius: 999px; }
     .be-need { font-size: 12px; color: var(--text-3); }
-    .stat-strip { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
+    .stat-strip { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; }
     .stat { background: var(--card); border: 1px solid var(--border); border-radius: var(--r, 14px);
-      padding: 17px 19px; box-shadow: var(--shadow-sm); transition: border-color .15s ease; }
+      padding: 18px 20px; box-shadow: var(--shadow-sm); transition: border-color .15s ease, transform .15s var(--ease); }
     .stat:hover { border-color: var(--border-2); }
     .stat-num { font-family: var(--mono); font-variant-numeric: tabular-nums; font-size: 24px; font-weight: 600;
       letter-spacing: -.025em; margin-top: 9px; line-height: 1; }
@@ -76,10 +78,10 @@
       .stat-strip { grid-template-columns: 1fr 1fr; }
       .today-hero { padding: 22px 20px; }
     }
-    .advisor-hero { position: relative; margin-bottom: 18px; padding: 24px 26px;
+    .advisor-hero { position: relative; margin-bottom: 18px; padding: 26px 28px;
       border-radius: var(--r-lg, 20px); border: 1px solid var(--border);
-      background: radial-gradient(120% 120% at 0% 0%, var(--accent-bg) 0%, transparent 42%), var(--card);
-      box-shadow: var(--glow); overflow: hidden; }
+      background: radial-gradient(140% 130% at 0% 0%, var(--accent-soft) 0%, transparent 34%), var(--card);
+      box-shadow: var(--shadow-sm); overflow: hidden; }
     .advisor-row { display: flex; align-items: flex-start; gap: 14px; }
     .advisor-avatar { width: 40px; height: 40px; border-radius: 12px; flex-shrink: 0;
       background: linear-gradient(135deg, var(--accent) 0%, var(--accent-2) 100%); color: #fff;
@@ -111,22 +113,24 @@
     .advisor-ask-input:focus { outline: none; border-color: var(--accent); }
     .advisor-ask-input::placeholder { color: var(--text-3); }
     .advisor-ask-btn { flex-shrink: 0; height: 44px; padding: 0 18px; border-radius: 11px; border: none;
-      background: linear-gradient(135deg, var(--accent) 0%, var(--accent-2) 100%); color: #fff; font: inherit; font-size: 14px; font-weight: 600; cursor: pointer;
-      box-shadow: 0 4px 14px -4px var(--accent); transition: filter .15s ease, transform .12s var(--ease); }
-    .advisor-ask-btn:hover { filter: brightness(1.06); transform: translateY(-1px); }
+      background: var(--accent); color: #fff; font: inherit; font-size: 14px; font-weight: 600; cursor: pointer;
+      box-shadow: var(--shadow-sm); transition: background .15s var(--ease), transform .12s var(--ease); }
+    .advisor-ask-btn:hover { background: var(--accent-2); transform: translateY(-1px); }
+    .advisor-ask-btn:active { transform: scale(.97); }
     .advisor-ask-btn:disabled { opacity: .45; cursor: default; box-shadow: none; transform: none; }
     .advisor-chips { display: flex; flex-wrap: wrap; gap: 7px; margin-top: 11px; }
     .advisor-chip { padding: 6px 12px; border-radius: 999px; border: 1px solid var(--border-2); background: var(--card);
       color: var(--text-2); font: inherit; font-size: 12.5px; cursor: pointer; transition: all .15s ease; }
     .advisor-chip:hover { border-color: var(--accent); color: var(--accent-2); }
     /* ════ Goals & Results ════ */
-    .goal-card { cursor: pointer; transition: border-color .15s ease, transform .1s ease; }
-    .goal-card:hover { border-color: var(--accent); }
+    .goal-card { cursor: pointer; transition: border-color .15s ease, transform .15s var(--ease), box-shadow .15s ease; }
+    .goal-card:hover { border-color: var(--border-2); transform: translateY(-1px); box-shadow: var(--shadow); }
     .goal-card:active { transform: scale(.995); }
-    .goal-bar { position: relative; height: 8px; border-radius: 5px; background: var(--surface-2); overflow: visible; }
-    .goal-bar-fill { height: 8px; border-radius: 5px; transition: width .6s var(--ease);
-      background: linear-gradient(90deg, var(--accent-2) 0%, var(--accent) 100%); }
-    .goal-bar-expected { position: absolute; top: -3px; width: 2px; height: 14px; background: var(--text-2); border-radius: 2px; opacity: .55; }
+    .goal-bar { position: relative; height: 10px; border-radius: 6px; background: var(--surface-3, var(--border)); overflow: visible; box-shadow: inset 0 0 0 1px var(--border); }
+    .goal-bar-fill { height: 10px; min-width: 6px; border-radius: 6px; transition: width .6s var(--ease);
+      background: linear-gradient(90deg, var(--accent-2) 0%, var(--accent) 100%); box-shadow: 0 1px 4px -1px var(--accent); }
+    .goal-bar-expected { position: absolute; top: -4px; width: 2px; height: 18px; background: var(--text-2); border-radius: 2px; opacity: .7; }
+    .goal-bar-expected::after { content: ''; position: absolute; top: -4px; left: -2px; width: 6px; height: 6px; border-radius: 50%; background: var(--text-2); }
     .goal-pace { font-size: 10.5px; font-weight: 600; padding: 3px 9px; border-radius: 999px; white-space: nowrap; letter-spacing: .02em; }
     .pace-reached { background: var(--ok-soft); color: var(--ok-ink); }
     .pace-ahead   { background: var(--ok-soft); color: var(--ok-ink); }
@@ -136,7 +140,7 @@
     .pace-no_deadline, .pace-no_data { background: var(--surface-2); color: var(--text-3); }
     .goal-result { display: flex; align-items: center; gap: 10px; margin-top: 14px; padding: 11px 13px;
       border-radius: 11px; background: var(--surface-2); font-size: 13px; color: var(--text-2); line-height: 1.45; }
-    .goal-stat-l { font-size: 11px; color: var(--text-3); text-transform: uppercase; letter-spacing: .06em; }
+    .goal-stat-l { font-size: 12px; color: var(--text-3); letter-spacing: -.005em; }
     .goal-stat-v { font-size: 22px; font-weight: 600; margin-top: 3px; }
     .goal-modal { max-width: 480px; width: 100%; }
     .goal-step { display: flex; align-items: flex-start; gap: 10px; padding: 9px 11px; border-radius: 9px;
@@ -147,8 +151,8 @@
     /* ════ Invoices ════ */
     .nav-badge { margin-left: auto; min-width: 18px; height: 18px; padding: 0 5px; border-radius: 9px;
       background: var(--warn); color: #fff; font-size: 11px; font-weight: 600; display: flex; align-items: center; justify-content: center; }
-    .invoice-card { cursor: pointer; transition: border-color .15s ease; }
-    .invoice-card:hover { border-color: var(--accent); }
+    .invoice-card { cursor: pointer; transition: border-color .15s ease, transform .15s var(--ease), box-shadow .15s ease; }
+    .invoice-card:hover { border-color: var(--border-2); transform: translateY(-1px); box-shadow: var(--shadow); }
     .invoice-card.paid { opacity: .82; }
     .inv-due { font-size: 11px; font-weight: 600; padding: 3px 9px; border-radius: 999px; white-space: nowrap; }
     .inv-due.due-ok { background: var(--accent-bg); color: var(--accent-2); }
@@ -157,8 +161,8 @@
     /* finish-setup banner */
     .setup-banner { margin: 16px 24px 0; padding: 20px 22px; border-radius: var(--r-lg, 20px);
       border: 1px solid var(--border); overflow: hidden;
-      background: radial-gradient(120% 120% at 100% 0%, var(--accent-bg) 0%, transparent 45%), var(--card);
-      box-shadow: var(--glow); }
+      background: radial-gradient(140% 130% at 100% 0%, var(--accent-soft) 0%, transparent 36%), var(--card);
+      box-shadow: var(--shadow-sm); }
     .setup-head { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 12px; }
     .setup-title { font-size: 15px; font-weight: 600; letter-spacing: -.01em; }
     .setup-sub { font-size: 12.5px; color: var(--text-3); margin-top: 2px; }
@@ -188,12 +192,12 @@
     }
     .brand { padding: 0 10px 24px; }
     .brand-name { font-family: var(--font-display); font-size: 18px; font-weight: 600; letter-spacing: -.01em; color: var(--text); }
-    .brand-sub  { font-size: 11px; color: var(--accent); letter-spacing: .14em; text-transform: uppercase; margin-top: 2px; }
+    .brand-sub  { font-size: 11px; color: var(--text-3); letter-spacing: .14em; text-transform: uppercase; margin-top: 2px; }
     .brand-status { display: flex; align-items: center; gap: 7px; margin-top: 14px; font-size: 12px; color: var(--text-3); }
     .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--pos); }
     .dot.bad { background: var(--neg); }
 
-    .nav-label { font-size: 10px; font-weight: 600; letter-spacing: .14em; text-transform: uppercase;
+    .nav-label { font-size: 11px; font-weight: 600; letter-spacing: 0;
       color: var(--text-3); padding: 18px 10px 6px; }
     .nav-item {
       position: relative;
@@ -203,7 +207,8 @@
       transition: background .14s var(--ease), color .14s ease;
     }
     .nav-item:hover { color: var(--text); background: var(--card-2); }
-    .nav-item.active { color: var(--accent-ink); background: var(--accent-bg); font-weight: 600; }
+    .nav-item.active { color: var(--text); background: var(--card-2); font-weight: 600; }
+    .nav-item.active svg { opacity: 1; color: var(--accent); }
     .nav-item.active::before { content: ''; position: absolute; left: -10px; top: 50%; transform: translateY(-50%);
       width: 3px; height: 18px; border-radius: 3px; background: var(--accent); }
     .nav-item svg { width: 17px; height: 17px; opacity: .9; }
@@ -212,9 +217,20 @@
     .sidebar-foot .num { color: var(--text-2); }
 
     /* ─────────────────────────── HEADER ─────────────────────────── */
-    .page-head { display: flex; align-items: flex-end; justify-content: space-between; margin-bottom: 38px; }
-    h1 { font-family: var(--font-display); font-size: 36px; font-weight: 700; letter-spacing: -.03em; line-height: 1.04; }
-    .page-sub { color: var(--text-3); font-size: 14px; margin-top: 7px; line-height: 1.45; }
+    .page-head { display: flex; align-items: flex-end; justify-content: space-between; margin-bottom: 30px; }
+    h1 { font-family: var(--font-display); font-size: 34px; font-weight: 600; letter-spacing: -.015em; line-height: 1.06; }
+    .page-sub { color: var(--text-3); font-size: 13.5px; margin-top: 6px; line-height: 1.45; }
+    /* icon-only ghost button (refresh etc.) */
+    .iconbtn { display: inline-flex; align-items: center; justify-content: center; width: 34px; height: 34px;
+      border-radius: 10px; border: 1px solid var(--border); background: transparent; color: var(--text-3);
+      cursor: pointer; transition: color .15s ease, border-color .15s ease; flex-shrink: 0; }
+    .iconbtn:hover { color: var(--text); border-color: var(--border-2); }
+    .iconbtn svg { width: 15px; height: 15px; }
+    /* menu-engineering quadrant dot (replaces emoji) */
+    .qdot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 6px; vertical-align: 1px; }
+    .qdot.star { background: var(--pos); } .qdot.plowhorse { background: var(--accent-2); }
+    .qdot.puzzle { background: var(--warn); } .qdot.dog { background: var(--neg); }
+    .btn svg, .agent-pill svg { width: 14px; height: 14px; vertical-align: -2px; }
 
     /* ─────────────────────────── INSIGHTS ─────────────────────────── */
     .insights { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 24px; }
@@ -240,15 +256,15 @@
       white-space: nowrap; transition: all .15s ease; }
     .advisor-note-ask:hover { background: var(--accent); color: #fff; }
     /* smart findings card — the advisor layer on data tabs */
-    .findings { margin-bottom: 20px; padding: 20px 22px; border-radius: var(--r-lg, 20px);
+    .findings { margin-bottom: 20px; padding: 22px 24px; border-radius: var(--r-lg, 20px);
       border: 1px solid var(--border); overflow: hidden;
-      background: radial-gradient(120% 120% at 0% 0%, var(--accent-bg) 0%, transparent 42%), var(--card);
-      box-shadow: var(--glow); }
+      background: radial-gradient(140% 130% at 0% 0%, var(--accent-soft) 0%, transparent 34%), var(--card);
+      box-shadow: var(--shadow-sm); }
     .findings-head { display: flex; align-items: center; gap: 9px; margin-bottom: 12px; }
     .findings-ic { width: 26px; height: 26px; border-radius: 8px; background: var(--accent); color: #fff;
       display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
     .findings-ic svg { width: 15px; height: 15px; }
-    .findings-title { font-family: var(--font-display); font-size: 15px; font-weight: 600; color: var(--accent-2); letter-spacing: -.01em; }
+    .findings-title { font-family: var(--font-display); font-size: 15px; font-weight: 600; color: var(--text); letter-spacing: -.01em; }
     .finding { display: flex; align-items: center; gap: 12px; padding: 10px 0; border-top: 1px solid var(--border); }
     .finding:first-of-type { border-top: none; }
     .finding-dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; background: var(--accent); }
@@ -259,7 +275,7 @@
       background: transparent; color: var(--accent-2); font: inherit; font-size: 12px; font-weight: 500;
       cursor: pointer; white-space: nowrap; transition: all .15s ease; }
     .finding-act:hover { background: var(--accent); color: #fff; }
-    .data-divider { font-size: 11px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase;
+    .data-divider { font-size: 12px; font-weight: 600; letter-spacing: -.005em;
       color: var(--text-3); margin: 6px 0 14px; }
 
     /* ─────────────────────────── CARDS & GRID ─────────────────────────── */
@@ -278,13 +294,21 @@
       /* CRITICAL iOS scroll: lock the viewport, scroll inside .main */
       html, body { height: 100%; overflow: hidden; overflow-x: hidden; }
       body { display: flex; flex-direction: column; height: 100dvh; }
-      .mobile-topbar { display: flex; align-items: center; gap: 12px; flex: 0 0 auto; z-index: 45;
-        height: 52px; padding: 0 16px; background: color-mix(in srgb, var(--bg) 82%, transparent);
-        backdrop-filter: saturate(1.4) blur(14px); -webkit-backdrop-filter: saturate(1.4) blur(14px);
+      .mobile-topbar { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex: 0 0 auto; z-index: 45;
+        height: 56px; padding: 0 16px; background: color-mix(in srgb, var(--bg) 80%, transparent);
+        backdrop-filter: saturate(1.5) blur(16px); -webkit-backdrop-filter: saturate(1.5) blur(16px);
         border-bottom: 1px solid var(--line); }
       .hamburger { display: none; }
-      .mobile-title { font-family: var(--font-display); font-size: 17px; font-weight: 700; letter-spacing: -.02em;
-        color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+      .mobile-brand { min-width: 0; display: flex; flex-direction: column; justify-content: center; }
+      .mobile-title { font-family: var(--font-display); font-size: 16px; font-weight: 700; letter-spacing: -.02em;
+        color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; line-height: 1.15; }
+      .mobile-city { font-size: 11px; font-weight: 500; letter-spacing: .12em; text-transform: uppercase;
+        color: var(--text-3); margin-top: 1px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+      .mobile-ava { flex: 0 0 auto; width: 34px; height: 34px; border-radius: 50%; border: 1px solid var(--line-2);
+        background: var(--accent-soft); color: var(--accent-ink); font-family: var(--font-display); font-size: 15px; font-weight: 700;
+        display: flex; align-items: center; justify-content: center; cursor: pointer;
+        transition: transform var(--t-fast) var(--ease), background var(--t-fast) var(--ease); }
+      .mobile-ava:active { transform: scale(.92); background: var(--accent-soft); }
       .shell { display: block; flex: 1 1 auto; min-height: 0; height: auto; }
       .sidebar { position: fixed; top: 0; left: 0; height: 100vh; z-index: 50; width: 84vw; max-width: 320px; min-width: 0;
         transform: translateX(-100%); transition: transform var(--t-mid, .28s) var(--ease);
@@ -297,6 +321,7 @@
       .card, .findings, .advisor-hero, .finding { min-width: 0; max-width: 100%; }
       .page { padding: 18px 18px calc(92px + env(safe-area-inset-bottom)); }
       .page-head { flex-direction: column; align-items: flex-start; gap: 8px; margin-bottom: 20px; }
+      .page-head.row-head { flex-direction: row; align-items: flex-start; justify-content: space-between; }
       h1, .page-head h1 { font-size: 30px !important; line-height: 1.06; }
       .kpi-value { font-size: 38px; }
       /* compact setup banner on mobile */
@@ -351,11 +376,11 @@
       transition: box-shadow var(--t-fast, .15s) ease, border-color .15s ease, transform .15s ease;
     }
     .card:hover { border-color: var(--border-2); }
-    .card-title { font-size: 12px; font-weight: 600; letter-spacing: .1em; text-transform: uppercase; color: var(--text-3); }
+    .card-title { font-size: 14px; font-weight: 600; letter-spacing: -.01em; color: var(--text); }
     .card-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 18px; }
 
     /* KPI */
-    .kpi-label { font-size: 11.5px; font-weight: 600; letter-spacing: .1em; text-transform: uppercase; color: var(--text-3); }
+    .kpi-label { font-size: 13px; font-weight: 500; letter-spacing: -.005em; color: var(--text-2); }
     .kpi-value { font-family: var(--mono); font-variant-numeric: tabular-nums; font-size: 42px; font-weight: 600; margin-top: 14px; letter-spacing: -.035em; line-height: .98; }
     .kpi-meta  { font-size: 12.5px; color: var(--text-3); margin-top: 6px; display:flex; gap:6px; align-items:baseline; }
     .delta-up   { color: var(--pos); font-weight: 600; }
@@ -390,7 +415,7 @@
     .rank-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13px; color: var(--text-2); }
     .rank-val { font-size: 13px; font-weight: 600; color: var(--text); flex-shrink: 0; }
     .rank-bar { height: 3px; border-radius: 2px; background: var(--accent); opacity: .85; }
-    .rank-track { width: 64px; height: 3px; border-radius: 2px; background: var(--border); flex-shrink: 0; }
+    .rank-track { width: 64px; height: 3px; border-radius: 2px; background: var(--surface-2); flex-shrink: 0; }
 
     /* buttons & inputs */
     .btn {
@@ -401,13 +426,13 @@
       transition: all .12s;
     }
     .btn:hover { color: var(--text); border-color: var(--text-3); }
-    .btn.primary { background: linear-gradient(135deg, var(--accent) 0%, var(--accent-2) 100%);
-      border-color: transparent; color: #fff; font-weight: 600;
-      box-shadow: 0 4px 14px -4px var(--accent); transition: transform .12s var(--ease), box-shadow .15s ease, filter .15s ease; }
-    .btn.primary:hover { filter: brightness(1.06); box-shadow: 0 6px 20px -4px var(--accent); transform: translateY(-1px); }
-    .btn.primary:active { transform: translateY(0) scale(.985); }
-    .btn.primary:hover { background: var(--accent-2); border-color: var(--accent-2); }
+    .btn:active { transform: scale(.97); }
+    .btn.primary { background: var(--accent); border-color: transparent; color: var(--on-accent, #1A1610); font-weight: 600;
+      box-shadow: var(--shadow-sm); transition: background .15s var(--ease), transform .12s var(--ease), box-shadow .15s ease; }
+    .btn.primary:hover { background: var(--accent-2); border-color: transparent; color: var(--on-accent, #1A1610); box-shadow: var(--shadow); transform: translateY(-1px); }
+    .btn.primary:active { transform: translateY(0) scale(.97); }
     .btn:disabled { opacity: .45; cursor: not-allowed; }
+    .btn:disabled:active { transform: none; }
     .btn.ghost { border-color: transparent; background: transparent; }
     .btn.danger { color: var(--neg); }
 
@@ -441,9 +466,8 @@
     .msg-col { min-width: 0; max-width: 88%; }
     .bubble-u {
       align-self: flex-end; max-width: 100%;
-      background: linear-gradient(135deg, var(--accent) 0%, var(--accent-2) 100%); border: none;
-      border-radius: 18px 18px 6px 18px; padding: 12px 16px; font-size: 14px; line-height: 1.5; color: #fff;
-      box-shadow: 0 4px 16px -6px var(--accent); }
+      background: var(--accent-soft); border: 1px solid var(--line-2);
+      border-radius: 18px 18px 6px 18px; padding: 12px 16px; font-size: 14px; line-height: 1.5; color: var(--text); }
     .bubble-a {
       align-self: flex-start; max-width: 100%;
       background: var(--card); border: 1px solid var(--border);
@@ -468,8 +492,11 @@
     .chip {
       border: 1px solid var(--border-2); background: var(--card-2); color: var(--text-2);
       font: inherit; font-size: 12px; padding: 6px 12px; border-radius: 999px; cursor: pointer;
+      white-space: nowrap; flex-shrink: 0;
     }
+    .followups .chip { max-width: 100%; overflow: hidden; text-overflow: ellipsis; }
     .chip:hover { color: var(--text); border-color: var(--text-3); }
+    .chip.on { background: var(--accent-soft); color: var(--accent-ink); border-color: var(--accent); }
 
     /* loading */
     @keyframes spin { to { transform: rotate(360deg); } }
@@ -490,11 +517,14 @@
     .ing-row { display: grid; grid-template-columns: 2fr .8fr .8fr 1fr 34px; gap: 8px; align-items: center; }
 
     /* toast */
-    .toasts { position: fixed; bottom: 20px; right: 20px; z-index: 60; display: flex; flex-direction: column; gap: 8px; }
-    .toast { background: var(--card); border: 1px solid var(--border-2); border-radius: 10px;
-      padding: 11px 16px; font-size: 13px; color: var(--text-2); }
-    .toast.ok  { border-color: var(--ok); }
-    .toast.err { border-color: var(--danger); }
+    .toasts { position: fixed; bottom: 20px; right: 20px; z-index: 60; display: flex; flex-direction: column; gap: 10px; }
+    .toast { position: relative; background: var(--card); border: 1px solid var(--border); border-radius: var(--r, 14px);
+      padding: 13px 18px 13px 20px; font-size: 13px; font-weight: 500; color: var(--text); line-height: 1.4;
+      box-shadow: var(--shadow); overflow: hidden; animation: toastIn .32s var(--ease); }
+    .toast::before { content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 3px; background: var(--text-3); }
+    .toast.ok::before  { background: var(--ok); }
+    .toast.err::before { background: var(--danger); }
+    @keyframes toastIn { from { opacity: 0; transform: translateY(10px) scale(.98); } to { opacity: 1; transform: none; } }
 
     /* briefing */
     .brief-summary { border-color: var(--accent); }
@@ -503,6 +533,52 @@
     .md ol,.md ul { padding-left: 20px; margin: 7px 0; }
     .md li { margin: 4px 0; line-height: 1.6; color: var(--text-2); }
     .md strong { color: var(--text); }
+    /* Report headings: outrank .page h1 so the markdown report keeps a calm hierarchy. */
+    .card .md h1 { font-size: 18px !important; font-weight: 650; margin: 2px 0 10px; letter-spacing: -.01em; line-height: 1.25; }
+    .card .md h2 { font-size: 14.5px; font-weight: 650; margin: 18px 0 6px; }
+    .card .md h3 { font-size: 13px; font-weight: 600; margin: 12px 0 4px; }
+
+    /* ── mobile fixes (placed last so they win source-order) ── */
+    @media (max-width: 768px) {
+      /* chat composer was hidden behind the bottom nav — reserve its height */
+      .chat-shell { height: calc(100% - 68px - env(safe-area-inset-bottom)); }
+      .chat-foot { padding: 12px 16px calc(12px + env(safe-area-inset-bottom)); gap: 10px;
+        background: color-mix(in srgb, var(--bg) 88%, transparent);
+        backdrop-filter: saturate(1.4) blur(12px); -webkit-backdrop-filter: saturate(1.4) blur(12px); }
+      .chat-foot .input, .chat-foot input { min-height: 46px; }
+      .chat-foot .btn, .chat-foot button { min-height: 46px; }
+
+      /* Tables were clipped by .main overflow-x:hidden. Two kinds:
+         - key/value tables (no <thead>): fit the width, wrap multi-word values.
+         - wide data tables (with <thead>): scroll horizontally, keep columns intact. */
+      table:not(:has(thead)) { width: 100%; table-layout: auto; }
+      table:not(:has(thead)) td { overflow-wrap: anywhere; }
+      table:has(thead) { display: block; width: 100%; overflow-x: auto; white-space: nowrap;
+        -webkit-overflow-scrolling: touch; }
+      table:has(thead) th, table:has(thead) td { white-space: nowrap; }
+      table:has(thead)::-webkit-scrollbar { height: 4px; }
+      table:has(thead)::-webkit-scrollbar-thumb { background: var(--line-2); border-radius: 99px; }
+
+      /* native tap feedback — no hover on touch, so press state matters */
+      .goal-card, .invoice-card, .recipe-card, .stat, .agent-pill, .chip, .nav-item, .bnav-item, .finding-act {
+        -webkit-tap-highlight-color: transparent; }
+      .goal-card:active, .invoice-card:active, .recipe-card:active {
+        transform: scale(.985); transition: transform .08s ease; }
+      .findings, .advisor-hero, .setup-banner { background-attachment: scroll; }
+
+      /* card headers with a long meta/suggestion on the right cramped on narrow screens */
+      .card-head { flex-direction: column; align-items: flex-start; gap: 7px; }
+      .card-head > div:last-child { flex-wrap: wrap; }
+
+      /* Pulpit (overview) headline KPIs: compact 2x2 grid so the dashboard opens
+         with all four numbers visible at a glance instead of four tall stacked cards. */
+      .ov-kpi { grid-template-columns: 1fr 1fr; gap: 12px; }
+      .ov-kpi .card { padding: 16px 16px 17px; }
+      .ov-kpi .kpi-label { font-size: 10.5px; letter-spacing: .07em; }
+      .ov-kpi .kpi-value { font-size: 25px; margin-top: 9px; letter-spacing: -.03em; }
+      .ov-kpi .kpi-meta { font-size: 11px; margin-top: 5px; line-height: 1.35; }
+      .ov-kpi .kpi-note { display: none; }
+    }
   </style>
   <link rel="manifest" href="/manifest.json">
   <meta name="theme-color" content="#0A0A0C">
@@ -515,10 +591,12 @@
 <body x-data="app()" x-init="init()">
 <!-- mobile topbar (only ≤768px) -->
 <div class="mobile-topbar">
-  <button class="hamburger" @click="navOpen=true" aria-label="Menu">
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M3 12h18M3 18h18"/></svg>
-  </button>
-  <div class="mobile-title" x-text="me?.tenant?.name || 'Growth OS'"></div>
+  <div class="mobile-brand">
+    <div class="mobile-title" x-text="me?.tenant?.name || 'Mise'"></div>
+    <div class="mobile-city" x-show="me?.tenant?.city" x-text="me?.tenant?.city"></div>
+  </div>
+  <button class="mobile-ava" @click="navOpen=true" aria-label="Menu i ustawienia"
+    x-text="(me?.tenant?.name || 'G').trim().charAt(0).toUpperCase()"></button>
 </div>
 <div class="nav-backdrop" x-show="navOpen" x-cloak @click="navOpen=false"></div>
 
@@ -528,19 +606,15 @@
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M3 10.5 12 3l9 7.5"/><path d="M5 9.5V21h14V9.5"/></svg>
     <span>Dziś</span>
   </button>
-  <button class="bnav-item" :class="tab==='overview' && 'on'" @click="go('overview')">
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/></svg>
-    <span>Pulpit</span>
+  <button class="bnav-item" :class="tab==='goals' && 'on'" @click="go('goals')">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="1.5"/></svg>
+    <span>Cele</span>
   </button>
   <button class="bnav-item" :class="tab==='chat' && 'on'" @click="go('chat')">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M12 3a4 4 0 014 4c0 1.5-.8 2.8-2 3.4V12h2a4 4 0 014 4v1H4v-1a4 4 0 014-4h2v-1.6C8.8 9.8 8 8.5 8 7a4 4 0 014-4z"/></svg>
     <span>Doradca</span>
   </button>
-  <button class="bnav-item" :class="tab==='goals' && 'on'" @click="go('goals')">
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="1.5"/></svg>
-    <span>Cele</span>
-  </button>
-  <button class="bnav-item" :class="navOpen && 'on'" @click="navOpen=true">
+  <button class="bnav-item" :class="(navOpen || !['today','goals','chat'].includes(tab)) && 'on'" @click="navOpen=true">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><circle cx="5" cy="12" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="19" cy="12" r="1.6"/></svg>
     <span>Więcej</span>
   </button>
@@ -551,7 +625,7 @@
   <!-- ════════════════════ SIDEBAR ════════════════════ -->
   <aside class="sidebar" :class="navOpen && 'open'">
     <div class="brand">
-      <div class="brand-name" x-text="me?.tenant?.name || 'Growth OS'"></div>
+      <div class="brand-name" x-text="me?.tenant?.name || 'Mise'"></div>
       <div class="brand-sub" x-text="me?.tenant?.city || 'Restaurant Intelligence'"></div>
       <div class="brand-status">
         <span class="dot" :class="(status?.order_count||0) === 0 && 'bad'"></span>
@@ -559,67 +633,43 @@
       </div>
     </div>
 
-    <div class="nav-label">Analityka</div>
-    <div class="nav-item" :class="tab==='today' && 'active'" @click="go('today')">
+    <div class="nav-item" :class="tab==='today' && 'active'" @click="go('today')" style="margin-top:6px;">
       <svg fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 8v4l2.5 2.5"/><path d="M12 3v1M21 12h-1M12 21v-1M3 12h1" stroke-width="2.2"/></svg>
       Dzisiaj
       <span x-show="todayData?.breakeven?.above" style="margin-left:auto; width:7px; height:7px; border-radius:50%; background:var(--pos);"></span>
-    </div>
-    <div class="nav-item" :class="tab==='overview' && 'active'" @click="go('overview')">
-      <svg fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/></svg>
-      Przegląd
-    </div>
-    <div class="nav-item" :class="tab==='revenue' && 'active'" @click="go('revenue')">
-      <svg fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path d="M3 17l6-6 4 4 8-8"/><path d="M14 7h7v7"/></svg>
-      Przychody
-    </div>
-    <div class="nav-item" :class="tab==='menu' && 'active'" @click="go('menu')">
-      <svg fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path d="M3 11h18M5 11V7a7 7 0 0114 0v4M4 11l1 9h14l1-9"/></svg>
-      Menu &amp; Food Cost
-    </div>
-    <div class="nav-item" :class="tab==='operations' && 'active'" @click="go('operations')">
-      <svg fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 3"/></svg>
-      Operacje
-    </div>
-
-    <div class="nav-label">Strategia</div>
-    <div class="nav-item" :class="tab==='audit' && 'active'" @click="go('audit')">
-      <svg fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/></svg>
-      Audyt
-      <span x-show="auditState && !auditState.complete && auditState.answered > 0" style="margin-left:auto; font-size:10px; color:var(--accent-2);" x-text="auditState.answered + '/' + auditState.total_questions"></span>
-      <span x-show="auditState?.complete" style="margin-left:auto; width:7px; height:7px; border-radius:50%; background:var(--pos);"></span>
-    </div>
-    <div class="nav-item" :class="tab==='research' && 'active'" @click="go('research')">
-      <svg fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
-      Analiza rynku
-      <span x-show="researchState?.status==='running'" style="margin-left:auto; width:7px; height:7px; border-radius:50%; background:var(--accent); animation:pulse 1.2s infinite;"></span>
-      <span x-show="researchState?.report && researchState?.status!=='running'" style="margin-left:auto; width:7px; height:7px; border-radius:50%; background:var(--pos);"></span>
     </div>
     <div class="nav-item" :class="tab==='goals' && 'active'" @click="go('goals')">
       <svg fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="1.5" fill="currentColor"/></svg>
       Cele
       <span x-show="goals.length" style="margin-left:auto; font-size:10px; color:var(--text-3);" x-text="goals.length"></span>
     </div>
-
-    <div class="nav-label">Agenci AI</div>
     <div class="nav-item" :class="tab==='chat' && 'active'" @click="go('chat')">
       <svg fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path d="M21 12a8 8 0 01-8 8H5l-2 2V12a8 8 0 018-8h2a8 8 0 018 8z"/></svg>
-      Rozmowa
-    </div>
-    <div class="nav-item" :class="tab==='briefing' && 'active'" @click="go('briefing')">
-      <svg fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75"/></svg>
-      Narada doradców
+      Doradca
     </div>
 
-    <div class="nav-label">Zarządzanie</div>
-    <div class="nav-item" :class="tab==='recipes' && 'active'" @click="go('recipes')">
-      <svg fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path d="M12 3a4 4 0 014 4c1.7 0 3 1.3 3 3 0 1.4-.9 2.5-2 2.9V21H7v-8.1c-1.1-.4-2-1.5-2-2.9 0-1.7 1.3-3 3-3a4 4 0 014-4z"/></svg>
-      Przepisy &amp; koszty
+    <div class="nav-label">Analiza</div>
+    <div class="nav-item" :class="tab==='analytics' && 'active'" @click="go('analytics')">
+      <svg fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path d="M3 17l6-6 4 4 8-8"/><path d="M14 7h7v7"/></svg>
+      Analityka
     </div>
-    <div class="nav-item" :class="tab==='invoices' && 'active'" @click="go('invoices')">
+    <div class="nav-item" :class="tab==='menu' && 'active'" @click="go('menu')">
+      <svg fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path d="M3 11h18M5 11V7a7 7 0 0114 0v4M4 11l1 9h14l1-9"/></svg>
+      Menu
+    </div>
+    <div class="nav-item" :class="tab==='purchasing' && 'active'" @click="go('purchasing')">
       <svg fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path d="M6 2h9l5 5v15H6z"/><path d="M14 2v6h6M9 13h6M9 17h6"/></svg>
-      Faktury
-      <span x-show="invoiceTotals?.unpaid_count" class="nav-badge" x-text="invoiceTotals?.unpaid_count"></span>
+      Zakupy
+      <span x-show="(invoiceTotals?.unpaid_count||0) + (priceSignals?.increases?.length||0) + (priceSignals?.overpaying?.length||0)"
+            class="nav-badge" x-text="(invoiceTotals?.unpaid_count||0) + (priceSignals?.increases?.length||0) + (priceSignals?.overpaying?.length||0)"></span>
+    </div>
+
+    <div class="nav-label">Firma</div>
+    <div class="nav-item" :class="tab==='strategy' && 'active'" @click="go('strategy')">
+      <svg fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/></svg>
+      Strategia
+      <span x-show="researchState?.status==='running'" style="margin-left:auto; width:7px; height:7px; border-radius:50%; background:var(--accent); animation:pulse 1.2s infinite;"></span>
+      <span x-show="auditState?.complete && researchState?.status!=='running'" style="margin-left:auto; width:7px; height:7px; border-radius:50%; background:var(--pos);"></span>
     </div>
     <div class="nav-item" :class="tab==='settings' && 'active'" @click="go('settings')">
       <svg fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19 12a7 7 0 00-.1-1.2l2-1.6-2-3.4-2.4 1a7 7 0 00-2-1.2L14 3h-4l-.4 2.6a7 7 0 00-2 1.2l-2.5-1-2 3.4 2 1.6A7 7 0 005 12c0 .4 0 .8.1 1.2l-2 1.6 2 3.4 2.4-1a7 7 0 002 1.2L10 21h4l.4-2.6a7 7 0 002-1.2l2.5 1 2-3.4-2-1.6c.1-.4.1-.8.1-1.2z"/></svg>
@@ -644,6 +694,18 @@
 
   <!-- ════════════════════ MAIN ════════════════════ -->
   <main class="main">
+
+    <!-- ──────────── GoPOS connection broken — live sync stopped ──────────── -->
+    <div x-show="connError" x-cloak
+         style="margin:14px 18px 0; padding:13px 16px; border-radius:14px; border:1px solid var(--danger);
+                background:var(--danger-soft); display:flex; gap:11px; align-items:flex-start;">
+      <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="var(--danger-ink)" stroke-width="1.8" style="flex-shrink:0; margin-top:1px;"><path d="M12 9v4M12 17h.01M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/></svg>
+      <div style="min-width:0; flex:1;">
+        <div style="font-size:13.5px; font-weight:600; color:var(--danger-ink);">GoPOS rozłączony — dane nie aktualizują się na żywo</div>
+        <div style="font-size:12.5px; color:var(--text-2); line-height:1.45; margin-top:3px;" x-text="connError"></div>
+        <a href="/onboarding/gopos" style="display:inline-block; margin-top:9px; font-size:13px; font-weight:600; color:var(--danger-ink);">Połącz GoPOS ponownie →</a>
+      </div>
+    </div>
 
     <!-- ──────────── Finish-setup banner (until onboarding complete) ──────────── -->
     <div class="setup-banner" x-show="!onboardingDone && setup && tab==='today'" x-cloak>
@@ -674,25 +736,23 @@
 
     <!-- ──────────────── TODAY ──────────────── -->
     <div x-show="tab==='today'" x-cloak class="page fade">
-      <div class="page-head">
+      <div class="page-head row-head">
         <div>
           <h1>Dzisiaj</h1>
           <div class="page-sub">
             <span x-text="todayData ? new Date(todayData.date).toLocaleDateString('pl-PL', {weekday:'long', day:'numeric', month:'long'}) : ''"></span>
-            <span x-show="todayData?.is_open_day" x-text="' · otwarte ' + todayData?.hours?.open + '–' + todayData?.hours?.close"></span>
+            <span x-show="todayData?.is_open_day" x-text="' · ' + todayData?.hours?.open + '–' + todayData?.hours?.close"></span>
             <span x-show="todayData && !todayData.is_open_day" style="color:var(--warn);"> · dziś zamknięte</span>
-            <span style="color:var(--text-3);" x-text="' · stan na ' + (todayData?.now || '')"></span>
           </div>
         </div>
-        <button class="btn" @click="refreshToday(true)" :disabled="todayLoading" style="flex-shrink:0;">
-          <span x-show="todayLoading" class="spinner"></span>
-          <span x-text="todayLoading ? 'Synchronizuję…' : '↻ Odśwież'"></span>
+        <button class="iconbtn" @click="refreshToday(true)" :disabled="todayLoading" title="Odśwież"
+                :style="todayLoading && 'opacity:.5'">
+          <span x-show="todayLoading" class="spinner" style="width:13px;height:13px;"></span>
+          <svg x-show="!todayLoading" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M21 12a9 9 0 1 1-2.64-6.36M21 3v6h-6"/></svg>
         </button>
       </div>
 
       <!-- ════ TODAY HERO: revenue + breakeven ════ -->
-      <div class="section-label">Dziś w liczbach</div>
-
       <!-- loading skeleton -->
       <div class="today-hero" x-show="!todayData">
         <span class="sk" style="width:88px;height:12px"></span>
@@ -703,20 +763,28 @@
 
       <!-- loaded -->
       <div class="today-hero" x-show="todayData" x-cloak
-           :style="(todayData?.orders||0)===0 ? 'border-color:var(--border)' : (todayData?.breakeven?.above ? 'border-color:rgba(52,211,153,.3)' : 'border-color:rgba(251,191,36,.28)')">
+           :style="(todayData?.orders||0)===0 ? 'border-color:var(--border)' : (todayData?.breakeven?.above ? 'border-color:rgba(69,196,160,.32)' : 'border-color:rgba(237,180,88,.30)')">
         <div class="kicker" style="color:var(--text-3)">Utarg dziś</div>
         <div class="today-hero-num" :style="(todayData?.orders||0)===0 ? 'color:var(--text-2)' : ''" x-text="fmtPLN(todayData?.revenue)"></div>
         <!-- has sales -->
         <div class="today-hero-sub" x-show="(todayData?.orders||0) > 0"
              x-text="todayData?.orders + ' zamówień' + (todayData?.last_order ? ' · ostatnie ' + todayData.last_order : '') + ' · śr. rachunek ' + fmtPLN(todayData?.avg_ticket, 2)"></div>
         <!-- warm empty / pre-open state -->
-        <div class="today-hero-sub" x-show="todayData && (todayData?.orders||0)===0"
-             x-text="!todayData?.is_open_day ? 'Dziś zamknięte — brak sprzedaży.'
+        <div class="today-hero-sub" x-show="todayData && (todayData?.orders||0)===0">
+          <span x-text="!todayData?.is_open_day ? 'Dziś zamknięte.'
                      : ((todayData?.hours?.open && (todayData?.now||'') < todayData?.hours?.open)
-                        ? ('Otwarcie o ' + todayData.hours.open + ' — pierwsze zamówienia pojawią się tutaj na żywo.')
-                        : 'Dzień się jeszcze nie rozkręcił — czekam na pierwsze zamówienia.')"></div>
+                        ? ('Otwarcie o ' + todayData.hours.open + ' — zamówienia pojawią się tutaj na żywo.')
+                        : 'Dzień się jeszcze nie rozkręcił — czekam na pierwsze zamówienia.')"></span>
+          <template x-if="todayData?.recent_day">
+            <div style="margin-top:13px; padding-top:13px; border-top:1px solid var(--border); display:flex; align-items:baseline; gap:8px;">
+              <span style="font-size:12.5px; color:var(--text-3);" x-text="'Ostatni dzień — ' + todayData.recent_day.weekday_label + ':'"></span>
+              <span class="num" style="font-size:16px; font-weight:600; color:var(--text);" x-text="fmtPLN(todayData.recent_day.revenue)"></span>
+              <span style="font-size:12px; color:var(--text-3);" x-text="todayData.recent_day.orders + ' zam.'"></span>
+            </div>
+          </template>
+        </div>
 
-        <div class="be">
+        <div class="be" x-show="(todayData?.orders||0) > 0 || (todayData?.breakeven?.revenue_needed||0) > 0">
           <div class="be-bar">
             <div :style="`width:${Math.min(todayData?.breakeven?.progress_pct || 0, 100)}%;
                           background:${todayData?.breakeven?.above ? 'var(--ok)' : 'linear-gradient(90deg,var(--accent-2),var(--accent))'}`"></div>
@@ -727,7 +795,7 @@
                     ? '✓ ' + fmtPLNc(todayData?.breakeven?.vs_breakeven) + ' nad progiem'
                     : 'do progu rentowności: ' + fmtPLNc(Math.abs(todayData?.breakeven?.vs_breakeven || 0))"></span>
             <span class="be-need">próg <b class="num" style="color:var(--text-2)" x-text="fmtPLNc(todayData?.breakeven?.revenue_needed)"></b>
-              · <span x-text="(todayData?.breakeven?.progress_pct || 0) + '%'"></span></span>
+              · <span x-text="Math.round(todayData?.breakeven?.progress_pct || 0) + '%'"></span></span>
           </div>
         </div>
       </div>
@@ -740,10 +808,15 @@
             <span class="sk" style="width:50%;height:22px;margin-top:12px"></span></div>
         </template>
       </div>
-      <div class="stat-strip" x-show="todayData" x-cloak>
+      <div class="stat-strip" x-show="todayData && (todayData?.orders||0) > 0" x-cloak>
         <div class="stat">
-          <div class="kicker" style="color:var(--text-3)">Projekcja końca dnia</div>
-          <template x-if="todayData?.projection?.available">
+          <div class="kicker" style="color:var(--text-3)" x-text="todayData?.day_phase==='after_close' ? 'Wynik dnia' : 'Projekcja końca dnia'"></div>
+          <!-- After close: the day is done — show the final result, not a projection. -->
+          <template x-if="todayData?.day_phase==='after_close'">
+            <div><div class="stat-num" x-text="fmtPLN(todayData?.revenue)"></div>
+            <div class="stat-meta" style="color:var(--text-3)">dzień zamknięty</div></div>
+          </template>
+          <template x-if="todayData?.day_phase!=='after_close' && todayData?.projection?.available">
             <div>
               <div class="stat-num" x-text="fmtPLN(todayData?.projection?.projected_total)"></div>
               <div class="stat-meta">
@@ -754,7 +827,7 @@
               </div>
             </div>
           </template>
-          <template x-if="todayData && !todayData?.projection?.available">
+          <template x-if="todayData?.day_phase!=='after_close' && todayData && !todayData?.projection?.available">
             <div><div class="stat-num" style="color:var(--text-3)">—</div>
             <div class="stat-meta" x-text="todayData?.projection?.note"></div></div>
           </template>
@@ -846,7 +919,7 @@
       <div class="section-label">Przebieg dnia</div>
       <div class="grid g-23">
         <div class="card">
-          <div class="card-head"><span class="card-title">Dziś godzina po godzinie · vs typowy ten dzień tygodnia</span></div>
+          <div class="card-head"><span class="card-title">Godzina po godzinie · vs typowy dzień</span></div>
           <div class="chart-wrap" style="height:250px;"><canvas id="chToday"></canvas></div>
         </div>
         <div class="card">
@@ -860,7 +933,7 @@
               </div>
             </template>
             <div class="empty" x-show="todayData && !(todayData?.top_items||[]).length" style="padding:28px 18px;">
-              <div class="empty-ic">🍽️</div>
+              <div class="empty-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" style="width:22px;height:22px;"><path d="M3 11h18M5 11V7a7 7 0 0114 0v4M4 11l1 9h14l1-9"/></svg></div>
               Jeszcze nic dziś nie sprzedano.<br>Najlepiej sprzedające się pozycje pojawią się tu na żywo.
             </div>
           </div>
@@ -869,22 +942,23 @@
     </div>
 
     <!-- ──────────────── AUDIT ──────────────── -->
-    <div x-show="tab==='audit'" x-cloak class="page fade">
+    <div x-show="tab==='strategy'" x-cloak class="page fade">
       <div class="page-head">
         <div>
-          <h1>Audyt firmy</h1>
-          <div class="page-sub">Wywiad z CEO → profil firmy + plan 90-dniowy. Im więcej powiesz, tym lepiej doradzę.</div>
+          <h1>Strategia</h1>
         </div>
       </div>
+
+      <div class="section-label">Audyt firmy</div>
 
       <!-- Progress -->
       <div class="card" style="margin-bottom:16px;">
         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
           <span class="card-title" x-text="auditState?.complete ? '✓ Audyt ukończony' : 'Postęp audytu'"></span>
-          <span class="num" style="color:var(--text-3);" x-text="(auditState?.answered || 0) + ' / ' + (auditState?.total_questions || 18) + ' pytań'"></span>
+          <span class="num" style="color:var(--text-3);" x-text="(auditState?.answered || 0) + ' / ' + (auditState?.total_questions || 19) + ' pytań'"></span>
         </div>
-        <div style="height:8px; border-radius:4px; background:var(--border); overflow:hidden;">
-          <div style="height:100%; border-radius:4px; transition:width .5s; background:var(--accent);"
+        <div style="height:8px; border-radius:5px; background:var(--surface-2); overflow:hidden;">
+          <div style="height:100%; border-radius:5px; transition:width .6s var(--ease); background:var(--accent);"
                :style="`width:${auditState?.progress_pct || 0}%`"></div>
         </div>
         <div style="margin-top:14px; display:flex; gap:8px;">
@@ -903,7 +977,7 @@
           <template x-for="(m, i) in auditChat" :key="i">
             <div :style="m.role==='user' ? 'align-self:flex-end; max-width:78%;' : 'align-self:flex-start; max-width:88%;'">
               <div :style="m.role==='user'
-                   ? 'background:var(--accent); color:#fff; padding:10px 14px; border-radius:14px 14px 4px 14px; font-size:13.5px;'
+                   ? 'background:var(--accent-soft); color:var(--text); border:1px solid var(--line-2); padding:10px 14px; border-radius:14px 14px 4px 14px; font-size:13.5px;'
                    : 'background:var(--card-2); padding:10px 14px; border-radius:14px 14px 14px 4px; font-size:13.5px; white-space:pre-wrap; line-height:1.55;'"
                    x-text="m.content"></div>
             </div>
@@ -919,14 +993,18 @@
         </div>
       </div>
 
-      <!-- Report -->
+      <!-- Report (collapsed to a teaser by default — the full text is a wall) -->
       <div class="card" x-show="auditReport" style="margin-bottom:16px;">
         <div class="card-head">
           <span class="card-title">Raport otwarcia + plan 90-dniowy</span>
           <span style="font-size:11.5px; color:var(--text-3);" x-text="auditReportDate ? new Date(auditReportDate).toLocaleDateString('pl-PL') : ''"></span>
         </div>
-        <div style="white-space:pre-wrap; line-height:1.65; font-size:13.5px; color:var(--text-2);" x-text="auditReport"></div>
-        <div style="margin-top:14px;">
+        <div class="md" style="font-size:13.5px;" x-show="!auditReportOpen"
+             x-html="md((auditReport||'').split('\n').slice(0,6).join('\n'))"></div>
+        <div class="md" style="font-size:13.5px;" x-show="auditReportOpen" x-cloak x-html="md(auditReport)"></div>
+        <div style="margin-top:14px; display:flex; gap:8px;">
+          <button class="btn" @click="auditReportOpen = !auditReportOpen"
+                  x-text="auditReportOpen ? 'Zwiń raport' : 'Pokaż cały raport'"></button>
           <button class="btn" @click="go('goals')">Zobacz cele z planu →</button>
         </div>
       </div>
@@ -946,11 +1024,11 @@
     </div>
 
     <!-- ──────────────── RESEARCH (Analiza rynku) ──────────────── -->
-    <div x-show="tab==='research'" x-cloak class="page fade">
-      <div class="page-head">
+    <div x-show="tab==='strategy'" x-cloak class="page fade" style="padding-top:0;">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin:8px 0 12px;">
         <div>
-          <h1>Analiza rynku</h1>
-          <p class="page-sub">Konkurencja, opinie, wydarzenia i trendy — zebrane z internetu i podsumowane przez AI.</p>
+          <div class="section-label" style="margin:0 0 2px;">Analiza rynku</div>
+          <div style="font-size:12px; color:var(--text-3);">Konkurencja, opinie, wydarzenia i trendy — z internetu, podsumowane przez AI</div>
         </div>
         <button class="btn primary" @click="runResearch()" :disabled="researchState?.status==='running'">
           <span x-show="researchState?.status==='running'" class="spinner"></span>
@@ -972,7 +1050,10 @@
       <div class="card" x-show="researchState?.report && researchState?.status!=='running'" x-cloak>
         <div style="font-size:12px; color:var(--text-3); margin-bottom:10px;" x-show="researchState?.report_date"
              x-text="'Ostatnia analiza: ' + new Date(researchState?.report_date).toLocaleDateString('pl-PL', {day:'numeric', month:'long', year:'numeric'})"></div>
-        <div class="md" x-html="marked.parse(researchState?.report || '')"></div>
+        <div class="md" x-show="!researchOpen" x-html="marked.parse((researchState?.report || '').split('\n').slice(0,6).join('\n'))"></div>
+        <div class="md" x-show="researchOpen" x-cloak x-html="marked.parse(researchState?.report || '')"></div>
+        <button class="btn" style="margin-top:12px;" @click="researchOpen = !researchOpen"
+                x-text="researchOpen ? 'Zwiń raport' : 'Pokaż cały raport'"></button>
 
         <div x-show="researchState?.suggested_goals?.length" style="margin-top:20px; padding-top:18px; border-top:1px solid var(--border);">
           <div style="font-size:13px; font-weight:600; margin-bottom:10px;">Proponowane cele z analizy</div>
@@ -983,8 +1064,12 @@
                   <div style="font-size:13px; font-weight:500;" x-text="g.title"></div>
                   <div style="font-size:11.5px; color:var(--text-3); margin-top:2px;" x-text="g.rationale"></div>
                 </div>
-                <div class="num" style="font-size:12px; color:var(--accent-2); white-space:nowrap;"
-                     x-text="metricLabel(g.metric) + ': ' + g.target_value"></div>
+                <div style="white-space:nowrap; flex-shrink:0;">
+                  <span x-show="g.metric !== 'manual' && g.target_value != null" class="num" style="font-size:12px; color:var(--accent-2);"
+                        x-text="metricLabel(g.metric) + ': ' + g.target_value"></span>
+                  <span x-show="g.metric === 'manual' || g.target_value == null" class="tag"
+                        style="font-size:10px; background:var(--surface-2); color:var(--text-3);">ręczny</span>
+                </div>
                 <button class="btn ghost" style="padding:6px 10px; font-size:12px; flex-shrink:0;"
                         :disabled="g._added" @click="addSuggestedGoal(g)"
                         x-text="g._added ? '✓ dodany' : 'Dodaj do celów'"></button>
@@ -997,53 +1082,110 @@
 
     <!-- ──────────────── GOALS ──────────────── -->
     <div x-show="tab==='goals'" x-cloak class="page fade">
-      <div class="page-head">
-        <div>
-          <h1>Cele</h1>
-          <div class="page-sub">Postęp mierzony automatycznie z danych sprzedażowych · rozliczany w porannym briefingu</div>
-        </div>
-        <button class="btn primary" @click="goalModal=true">+ Nowy cel</button>
+      <div class="page-head" style="margin-bottom:24px;">
+        <div><h1>Cele</h1></div>
+        <button @click="newGoal()" aria-label="Nowy cel"
+          style="background:none; border:none; color:var(--text-3); font:inherit; font-size:13px; font-weight:500; cursor:pointer; padding:8px 2px; display:flex; align-items:center; gap:5px; transition:color .15s ease;"
+          onmouseover="this.style.color='var(--text)'" onmouseout="this.style.color='var(--text-3)'">
+          <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg> Nowy
+        </button>
       </div>
 
-      <div class="empty" x-show="dataReady && !goals.length" style="padding:40px;">
-        Brak celów. Zrób <a href="#" style="color:var(--accent-2);" @click.prevent="go('audit')">audyt</a> —
-        CEO zaproponuje plan z celami — albo dodaj cel ręcznie.
+      <div class="empty" x-show="dataReady && !goals.length" style="padding:56px 24px;">
+        <div class="empty-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" style="width:22px;height:22px;"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="1.5" fill="currentColor"/></svg></div>
+        <div style="color:var(--text); font-weight:600; font-size:15px; margin-bottom:6px;">Jeszcze nie masz celów</div>
+        Zrób <a href="#" style="color:var(--accent-2); font-weight:500;" @click.prevent="go('audit')">audyt firmy</a>,
+        a CEO zaproponuje plan z celami — albo dodaj pierwszy cel ręcznie.
+        <div style="margin-top:18px;"><button class="btn primary" style="width:auto;" @click="newGoal()">+ Dodaj pierwszy cel</button></div>
       </div>
 
       <div class="grid g-2">
-        <template x-for="g in goals" :key="g.id">
+        <template x-for="g in customGoals()" :key="g.id">
           <div class="card goal-card" @click="openGoal(g)">
             <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:10px;">
               <div style="min-width:0;">
                 <div class="strong" style="font-size:15px;" x-text="g.title"></div>
-                <div style="font-size:11.5px; color:var(--text-3); margin-top:2px;">
-                  <span x-text="metricLabel(g.metric)"></span>
+                <div style="font-size:11.5px; color:var(--text-3); margin-top:2px;"
+                     x-show="(g.period_from || (g.metric !== 'manual' && metricLabel(g.metric) !== g.title)) || (g.days_left != null && !g.reached)">
+                  <span x-show="g.period_from || (g.metric !== 'manual' && metricLabel(g.metric) !== g.title)"
+                        x-text="g.period_from ? goalPeriod(g) : metricLabel(g.metric)"></span>
                   <span x-show="g.days_left != null && !g.reached"
-                        x-text="g.days_left >= 0 ? ' · ' + g.days_left + ' dni do końca' : ' · po terminie'"></span>
+                        x-text="((g.period_from || (g.metric !== 'manual' && metricLabel(g.metric) !== g.title)) ? ' · ' : '') + (g.days_left >= 0 ? g.days_left + ' dni do końca' : 'po terminie')"></span>
                 </div>
               </div>
-              <span class="goal-pace" :class="'pace-' + (g.pace||'no_deadline')" x-text="paceLabel(g.pace)"></span>
+              <span class="goal-pace" :class="'pace-' + (g.metric==='manual' ? (g.reached?'reached':'no_deadline') : (g.pace||'no_deadline'))"
+                    x-text="g.metric==='manual' ? (g.reached ? 'Zrobione' : 'Ręczny') : paceLabel(g.pace)"></span>
             </div>
-            <div style="display:flex; align-items:baseline; gap:10px; margin:14px 0 8px;">
-              <span class="num" style="font-size:26px; font-weight:600;"
-                    :style="`color:${g.reached ? 'var(--pos)' : 'var(--text)'}`"
-                    x-text="g.current_value != null ? fmtGoalVal(g) : '—'"></span>
-              <span style="color:var(--text-3); font-size:13px;" class="num" x-text="'/ cel ' + g.target_value"></span>
-            </div>
-            <div class="goal-bar">
-              <div class="goal-bar-fill"
-                   :style="`width:${Math.max(0, Math.min(g.progress_pct || 0, 100))}%;
-                            background:${g.reached ? 'var(--ok)' : (g.pace==='behind'||g.pace==='overdue') ? 'var(--warn)' : 'linear-gradient(90deg,var(--accent-2),var(--accent))'}`"></div>
-              <div class="goal-bar-expected" x-show="g.expected_pct != null && !g.reached"
-                   :style="`left:${Math.max(0, Math.min(g.expected_pct, 100))}%`" title="Gdzie powinieneś być dziś"></div>
-            </div>
-            <div style="display:flex; justify-content:space-between; font-size:11px; color:var(--text-3); margin-top:5px;">
-              <span x-text="'start: ' + (g.baseline_value != null ? Math.round(g.baseline_value*10)/10 : '—')"></span>
-              <span x-text="g.progress_pct != null ? g.progress_pct + '% drogi' : ''"></span>
-            </div>
+            <!-- Qualitative (manual) goal: no numbers, marked done by hand -->
+            <template x-if="g.metric === 'manual'">
+              <div style="margin:12px 0 0; font-size:13px;"
+                   :style="`color:${g.reached ? 'var(--pos)' : 'var(--text-2)'}`"
+                   x-text="g.reached ? '✓ Zrealizowany' : 'Cel jakościowy — oznacz ręcznie, gdy zrobione'"></div>
+            </template>
+            <!-- Measured goal -->
+            <template x-if="g.metric !== 'manual'">
+              <div>
+                <div style="display:flex; align-items:baseline; gap:8px; margin:14px 0 0;">
+                  <span class="num" style="font-size:24px; font-weight:600;"
+                        :style="`color:${g.reached ? 'var(--pos)' : (g.not_started ? 'var(--accent-2)' : 'var(--text)')}`"
+                        x-text="g.not_started ? fmtGoalNum(g, g.target_value) : (g.current_value != null ? fmtGoalVal(g) : '—')"></span>
+                  <span style="color:var(--text-3); font-size:13px;" class="num"
+                        x-text="g.not_started ? ('cel' + (g.starts_in_days!=null ? ' · start za ' + g.starts_in_days + ' dni' : '')) : ('/ ' + fmtGoalNum(g, g.target_value))"></span>
+                </div>
+                <div x-show="g.not_started && goalCompare(g)" style="font-size:11.5px; color:var(--text-3); margin-top:6px;" x-text="goalCompare(g)"></div>
+                <template x-if="!g.reached && !g.not_started">
+                  <div>
+                    <div class="goal-bar" style="margin-top:12px;">
+                      <div class="goal-bar-fill"
+                           :style="`width:${Math.max(0, Math.min(g.progress_pct || 0, 100))}%;
+                                    background:${(g.pace==='behind'||g.pace==='overdue') ? 'var(--warn)' : 'linear-gradient(90deg,var(--accent-2),var(--accent))'}`"></div>
+                      <div class="goal-bar-expected" x-show="g.expected_pct != null"
+                           :style="`left:${Math.max(0, Math.min(g.expected_pct, 100))}%`" title="Gdzie powinieneś być dziś"></div>
+                    </div>
+                    <div style="display:flex; justify-content:space-between; gap:8px; font-size:11px; color:var(--text-3); margin-top:7px;"
+                         x-show="g.progress_pct != null">
+                      <span x-show="g.in_progress && g.elapsed_pct != null" x-text="'minęło ' + Math.round(g.elapsed_pct) + '% okresu'"></span>
+                      <span x-show="!(g.in_progress && g.elapsed_pct != null)"></span>
+                      <span style="color:var(--text-2); font-weight:600;" x-text="g.progress_pct + '% celu'"></span>
+                    </div>
+                  </div>
+                </template>
+              </div>
+            </template>
           </div>
         </template>
       </div>
+
+      <!-- Cicha zachęta: brakuje celu zysku (sama liczba mieszka w Analityce) -->
+      <button x-show="netProfit && !netStar().hasTarget" x-cloak
+              @click="newGoal('Pomóż mi ustawić cel realnego zysku netto. Zaproponuj sensowny cel miesięczny w oparciu o moje dane i ambicje, pokaż liczby i ustaw go po moim potwierdzeniu.')"
+              style="display:flex; align-items:center; gap:9px; width:100%; margin-top:14px; padding:13px 16px;
+                     background:none; border:1px dashed var(--border-2); border-radius:14px; cursor:pointer;
+                     color:var(--text-3); font:inherit; font-size:13px; text-align:left; transition:color .15s ease, border-color .15s ease;"
+              onmouseover="this.style.color='var(--accent-ink)'; this.style.borderColor='var(--accent)';"
+              onmouseout="this.style.color='var(--text-3)'; this.style.borderColor='var(--border-2)';">
+        <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8" style="flex-shrink:0;"><path d="M12 5v14M5 12h14"/></svg>
+        Nie masz celu na zysk netto — ustaw go z doradcą
+      </button>
+
+      <!-- Następny ruch — doradca jednym zdaniem -->
+      <template x-if="focusMove()">
+        <div style="display:flex; gap:13px; align-items:flex-start; padding:20px 8px 6px;">
+          <span style="width:28px; height:28px; border-radius:50%; flex-shrink:0;
+                       background:radial-gradient(circle at 35% 30%, var(--accent-2), var(--accent));
+                       box-shadow:0 0 14px var(--accent-soft);"></span>
+          <div style="min-width:0;">
+            <div style="font-size:13.5px; color:var(--text-2); line-height:1.5;">
+              <b style="color:var(--text);" x-text="focusMove().title + '.'"></b>
+              <span x-text="' ' + focusMove().why"></span>
+            </div>
+            <button @click="focusAct(focusMove())"
+                    style="margin-top:9px; background:none; border:1px solid var(--accent); border-radius:999px;
+                           color:var(--accent-ink); font:inherit; font-size:12px; font-weight:600; padding:5px 14px; cursor:pointer;"
+                    x-text="focusMove().cta"></button>
+          </div>
+        </div>
+      </template>
     </div>
 
     <!-- GOAL DETAIL MODAL -->
@@ -1054,7 +1196,9 @@
             <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:12px; margin-bottom:4px;">
               <div>
                 <div class="serif" style="font-size:20px; font-weight:560;" x-text="goalDetail.title"></div>
-                <div style="font-size:12px; color:var(--text-3); margin-top:3px;" x-text="metricLabel(goalDetail.metric)"></div>
+                <div style="font-size:12px; color:var(--text-3); margin-top:3px;"
+                     x-show="goalDetail.period_from || !goalDetail.title.toLowerCase().includes(metricLabel(goalDetail.metric).toLowerCase())"
+                     x-text="goalDetail.period_from ? goalPeriod(goalDetail) : metricLabel(goalDetail.metric)"></div>
               </div>
               <button class="btn ghost" @click="goalDetail=null">✕</button>
             </div>
@@ -1065,27 +1209,49 @@
               <span x-text="paceExplain(goalDetail)"></span>
             </div>
 
-            <!-- baseline → current → target -->
-            <div style="display:flex; align-items:baseline; justify-content:space-between; margin:18px 0 6px;">
-              <div><div class="goal-stat-l">Start</div><div class="num goal-stat-v" x-text="goalDetail.baseline_value != null ? Math.round(goalDetail.baseline_value*10)/10 : '—'"></div></div>
-              <div style="text-align:center;"><div class="goal-stat-l">Teraz</div><div class="num goal-stat-v" style="color:var(--accent-2);" x-text="goalDetail.current_value != null ? fmtGoalVal(goalDetail) : '—'"></div></div>
-              <div style="text-align:right;"><div class="goal-stat-l">Cel</div><div class="num goal-stat-v" style="color:var(--pos);" x-text="goalDetail.target_value"></div></div>
-            </div>
-            <div class="goal-bar" style="height:9px;">
-              <div class="goal-bar-fill" :style="`width:${Math.max(0, Math.min(goalDetail.progress_pct || 0, 100))}%;
-                   background:${goalDetail.reached ? 'var(--ok)' : 'linear-gradient(90deg,var(--accent-2),var(--accent))'}`"></div>
-              <div class="goal-bar-expected" x-show="goalDetail.expected_pct != null && !goalDetail.reached"
-                   :style="`left:${Math.max(0, Math.min(goalDetail.expected_pct, 100))}%`"></div>
-            </div>
-            <div style="font-size:11px; color:var(--text-3); margin-top:5px; text-align:right;"
-                 x-text="(goalDetail.progress_pct ?? 0) + '% drogi' + (goalDetail.expected_pct != null ? ' · plan na dziś: ' + goalDetail.expected_pct + '%' : '')"></div>
+            <!-- ── one focused number, state-aware (minimal) ── -->
+            <!-- not started: lead with the target -->
+            <template x-if="goalDetail.not_started">
+              <div style="margin:20px 0 6px;">
+                <div class="goal-stat-l">Cel</div>
+                <div class="num" style="font-size:32px; font-weight:600; letter-spacing:-.02em; color:var(--accent-2); margin-top:2px;" x-text="fmtGoalNum(goalDetail, goalDetail.target_value)"></div>
+                <div style="font-size:13px; color:var(--text-3); margin-top:6px;" x-show="goalCompare(goalDetail)" x-text="goalCompare(goalDetail)"></div>
+              </div>
+            </template>
+            <!-- in progress: current → target + bar -->
+            <template x-if="!goalDetail.not_started && !goalDetail.reached">
+              <div style="margin:20px 0 6px;">
+                <div style="display:flex; align-items:baseline; gap:8px;">
+                  <span class="num" style="font-size:32px; font-weight:600; letter-spacing:-.02em;" x-text="goalDetail.current_value != null ? fmtGoalVal(goalDetail) : '—'"></span>
+                  <span class="num" style="font-size:15px; color:var(--text-3);" x-text="'/ ' + fmtGoalNum(goalDetail, goalDetail.target_value)"></span>
+                </div>
+                <div class="goal-bar" style="height:9px; margin-top:14px;">
+                  <div class="goal-bar-fill" :style="`width:${Math.max(0, Math.min(goalDetail.progress_pct || 0, 100))}%;
+                       background:${(goalDetail.pace==='behind'||goalDetail.pace==='overdue') ? 'var(--warn)' : 'linear-gradient(90deg,var(--accent-2),var(--accent))'}`"></div>
+                  <div class="goal-bar-expected" x-show="goalDetail.expected_pct != null"
+                       :style="`left:${Math.max(0, Math.min(goalDetail.expected_pct, 100))}%`"></div>
+                </div>
+                <div style="display:flex; justify-content:space-between; gap:10px; font-size:11.5px; color:var(--text-3); margin-top:6px;">
+                  <span x-text="goalDetail.in_progress && goalDetail.elapsed_pct != null ? ('minęło ' + Math.round(goalDetail.elapsed_pct) + '% okresu') : goalCompare(goalDetail)"></span>
+                  <span style="white-space:nowrap; color:var(--text-2); font-weight:600;" x-text="(goalDetail.progress_pct ?? 0) + '% celu'"></span>
+                </div>
+              </div>
+            </template>
+            <!-- reached: clean result -->
+            <template x-if="goalDetail.reached">
+              <div style="margin:20px 0 6px;">
+                <div class="goal-stat-l">Wynik</div>
+                <div class="num" style="font-size:32px; font-weight:600; letter-spacing:-.02em; color:var(--pos); margin-top:2px;" x-text="goalDetail.current_value != null ? fmtGoalVal(goalDetail) : fmtGoalNum(goalDetail, goalDetail.target_value)"></div>
+                <div style="font-size:13px; color:var(--text-3); margin-top:6px;" x-text="'Cel: ' + fmtGoalNum(goalDetail, goalDetail.target_value)"></div>
+              </div>
+            </template>
 
             <!-- action plan / steps -->
-            <div style="margin-top:22px; display:flex; justify-content:space-between; align-items:center;">
+            <div style="margin-top:22px; display:flex; justify-content:space-between; align-items:center; gap:10px;">
               <div class="strong" style="font-size:14px;">Plan działania</div>
-              <button class="btn ghost" style="font-size:12px;" @click="generatePlan()" :disabled="planLoading">
+              <button class="btn ghost" style="font-size:12px; white-space:nowrap; flex-shrink:0;" @click="generatePlan()" :disabled="planLoading">
                 <span x-show="planLoading" class="spinner" style="width:12px;height:12px;"></span>
-                <span x-text="planLoading ? '' : (goalSteps.length ? '↻ Wygeneruj nowy' : '✨ Poproś doradcę o plan')"></span>
+                <span x-text="planLoading ? '' : (goalSteps.length ? '↻ Nowy plan' : '✨ Plan od AI')"></span>
               </button>
             </div>
             <div style="margin-top:10px; display:flex; flex-direction:column; gap:7px;">
@@ -1105,10 +1271,12 @@
               </div>
             </div>
 
-            <div style="display:flex; gap:8px; margin-top:22px;">
-              <button class="btn primary" style="flex:1;" @click="askAboutGoal(goalDetail)">Zapytaj doradcę o ten cel</button>
-              <button class="btn ghost" x-show="!goalDetail.reached" @click="finishGoal(goalDetail.id); goalDetail=null">✓ Zrealizowany</button>
-              <button class="btn ghost danger" @click="delGoal(goalDetail.id); goalDetail=null">✕</button>
+            <div style="display:flex; flex-direction:column; gap:8px; margin-top:22px;">
+              <button class="btn primary" style="width:100%; white-space:nowrap;" @click="askAboutGoal(goalDetail)">Zapytaj doradcę o ten cel</button>
+              <div style="display:flex; gap:8px;">
+                <button class="btn ghost" style="flex:1; white-space:nowrap;" x-show="!goalDetail.reached" @click="finishGoal(goalDetail.id); goalDetail=null">✓ Oznacz zrealizowany</button>
+                <button class="btn ghost danger" style="white-space:nowrap;" @click="delGoal(goalDetail.id); goalDetail=null">Usuń</button>
+              </div>
             </div>
           </div>
         </template>
@@ -1116,43 +1284,24 @@
     </div>
 
     <!-- ──────────────── OVERVIEW ──────────────── -->
-    <div x-show="tab==='overview'" x-cloak class="page fade">
+    <div x-show="tab==='analytics'" x-cloak class="page fade">
       <div class="page-head">
         <div>
-          <h1>Przegląd</h1>
+          <h1>Analityka</h1>
           <div class="page-sub" x-text="periodLabel()"></div>
         </div>
-        <button class="btn" @click="reloadAll()">↻ Odśwież</button>
-      </div>
-
-      <div class="findings" x-show="smartFindings('overview').length" x-cloak>
-        <div class="findings-head">
-          <span class="findings-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M12 3a4 4 0 014 4c0 1.5-.8 2.8-2 3.4V12h2a4 4 0 014 4v1H4v-1a4 4 0 014-4h2v-1.6C8.8 9.8 8 8.5 8 7a4 4 0 014-4z"/></svg></span>
-          <span class="findings-title">Co widzę i co bym zrobił</span>
+        <div style="display:flex; gap:10px; align-items:center;">
+          <div class="seg">
+            <button :class="anDays===14 && 'on'" @click="setAnDays(14)">14 dni</button>
+            <button :class="anDays===30 && 'on'" @click="setAnDays(30)">30 dni</button>
+            <button :class="anDays===90 && 'on'" @click="setAnDays(90)">90 dni</button>
+          </div>
+          <button class="btn" @click="reloadAll()">↻</button>
         </div>
-        <template x-for="(f, fi) in smartFindings('overview')" :key="fi">
-          <div class="finding">
-            <span class="finding-dot" :class="f.tone"></span>
-            <span class="finding-text" x-text="f.text"></span>
-            <button class="finding-act" @click="doFinding(f.action)" x-text="f.action.label"></button>
-          </div>
-        </template>
       </div>
 
-      <div class="data-divider" x-show="smartFindings('overview').length">Dane szczegółowe</div>
-
-      <!-- Insight strip — rule-based, computed from real data -->
-      <div class="insights" x-show="insights.length">
-        <template x-for="ins in insights" :key="ins.text">
-          <div class="insight">
-            <span class="insight-mark"></span>
-            <span x-html="ins.html"></span>
-          </div>
-        </template>
-      </div>
-
-      <!-- KPI row -->
-      <div class="grid g-4" style="margin-bottom:16px;">
+      <!-- KPI row — headline numbers first, so the dashboard opens with the data -->
+      <div class="grid g-4 ov-kpi" style="margin-bottom:16px;">
         <div class="card">
           <div class="kpi-label">Przychód · 30 dni</div>
           <div class="kpi-value num" x-text="fmtPLN(kpis?.revenue_30d)"></div>
@@ -1190,7 +1339,7 @@
               <div class="kpi-value num" :style="`color:${kpis.net_profit_30d >= 0 ? 'var(--pos)' : 'var(--neg)'}`"
                    x-text="fmtPLN(kpis?.net_profit_30d)"></div>
               <div class="kpi-meta"><span x-text="'marża ' + kpis?.net_margin_pct + '% · food cost ' + kpis?.food_cost_pct + '%'"></span></div>
-              <div class="kpi-meta" x-show="kpis?.net_complete === false" style="color:var(--warn-ink);"
+              <div class="kpi-meta kpi-note" x-show="kpis?.net_complete === false" style="color:var(--warn-ink);"
                    x-text="kpis?.net_basis_note"></div>
             </div>
           </template>
@@ -1203,65 +1352,44 @@
         </div>
       </div>
 
-      <!-- Main revenue chart -->
-      <div class="card" style="margin-bottom:16px;">
-        <div class="card-head">
-          <span class="card-title">Dzienny przychód</span>
-          <div class="seg">
-            <button :class="revDays===14 && 'on'" @click="revDays=14; renderOverview()">14 dni</button>
-            <button :class="revDays===30 && 'on'" @click="revDays=30; renderOverview()">30 dni</button>
-            <button :class="revDays===90 && 'on'" @click="revDays=90; renderOverview()">90 dni</button>
+      <!-- Rachunek zysku (przeniesiony z Celów — to analityka, nie cel) -->
+      <div class="card" style="padding:4px 6px; margin-bottom:16px;" x-show="netProfit" x-cloak>
+        <div style="display:flex; justify-content:space-between; align-items:baseline; padding:12px 12px 4px;">
+          <span class="card-title">Rachunek zysku</span>
+          <span style="font-size:11px; color:var(--text-3);" x-text="leverPeriodLabel()"></span>
+        </div>
+        <template x-for="(lv, i) in profitLevers()" :key="lv.key">
+          <div @click="go(lv.tab)" class="lever-row"
+               style="display:flex; align-items:center; gap:10px; padding:12px; cursor:pointer; border-radius:12px; transition:background .14s ease;"
+               :style="i!==0 ? 'box-shadow:0 -1px 0 var(--border)' : ''"
+               onmouseover="this.style.background='var(--card-2)'" onmouseout="this.style.background='transparent'">
+            <span style="flex:1; min-width:0; font-size:14.5px; color:var(--text); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;" x-text="lv.label"></span>
+            <span style="font-size:10.5px; width:80px; text-align:right; flex-shrink:0;" :style="`color:${lv.color}`" x-text="lv.note"></span>
+            <span class="num" style="font-size:14px; font-weight:600; width:82px; text-align:right;"
+                  :style="`color:${lv.sign==='+' ? 'var(--text)' : 'var(--text-2)'}`"
+                  x-show="lv.amount!=null" x-text="lv.sign + ' ' + fmtPLNc(lv.amount)"></span>
+            <span class="num" style="font-size:14px; color:var(--text-3); width:82px; text-align:right;" x-show="lv.amount==null">—</span>
+            <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="var(--text-3)" stroke-width="1.6" style="flex-shrink:0; opacity:.6;"><path d="m9 18 6-6-6-6"/></svg>
           </div>
-        </div>
-        <div class="chart-wrap" style="height:280px;">
-          <canvas id="chRevenue"></canvas>
-        </div>
-        <div class="empty" x-show="dataReady && !daily.length">Brak sprzedaży w tym okresie.</div>
-      </div>
-
-      <!-- Secondary row -->
-      <div class="grid g-3">
-        <div class="card">
-          <div class="card-head"><span class="card-title">Rozkład godzinowy · 14 dni</span></div>
-          <div class="chart-wrap" style="height:210px;"><canvas id="chHourly"></canvas></div>
-        </div>
-        <div class="card">
-          <div class="card-head"><span class="card-title">Kanały sprzedaży · 30 dni</span></div>
-          <div class="chart-wrap" style="height:210px;"><canvas id="chChannels"></canvas></div>
-          <div class="empty" x-show="dataReady && !channels.length">Brak danych o kanałach.</div>
-        </div>
-        <div class="card">
-          <div class="card-head"><span class="card-title">Top dania · 30 dni</span></div>
-          <div class="rank">
-            <template x-for="(it, i) in topItems.slice(0,7)" :key="it.item_name">
-              <div class="rank-row">
-                <span class="rank-i" x-text="i+1"></span>
-                <span class="rank-name" x-text="it.item_name" :title="it.item_name"></span>
-                <span class="rank-track"><span class="rank-bar" :style="`width:${topItems[0]?.total_revenue ? (it.total_revenue/topItems[0].total_revenue*100) : 0}%; display:block;`"></span></span>
-                <span class="rank-val num" x-text="fmtPLNc(it.total_revenue)"></span>
-              </div>
-            </template>
-            <div class="empty" x-show="dataReady && !topItems.length">Brak danych.</div>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <!-- ──────────────── REVENUE ──────────────── -->
-    <div x-show="tab==='revenue'" x-cloak class="page fade">
-      <div class="page-head">
-        <div>
-          <h1>Przychody</h1>
-          <div class="page-sub">Trendy, tygodnie, dni i zespół</div>
+        </template>
+        <div style="display:flex; align-items:center; gap:10px; padding:13px 12px; box-shadow:0 -1px 0 var(--border-2); margin-top:2px;"
+             x-show="netProfit?.net_profit != null">
+          <span style="flex:1; font-size:14.5px; font-weight:640; color:var(--text);">Zysk netto</span>
+          <span style="font-size:10.5px; width:80px; text-align:right; color:var(--text-3);"
+                x-show="netProfit?.net_margin_pct != null" x-text="Math.round(netProfit?.net_margin_pct) + '% marży'"></span>
+          <span class="num" style="font-size:15px; font-weight:700; width:82px; text-align:right;"
+                :style="`color:${(netProfit?.net_profit||0) >= 0 ? 'var(--pos)' : 'var(--danger-ink)'}`"
+                x-text="fmtPLNc(netProfit?.net_profit)"></span>
+          <span style="width:15px; flex-shrink:0;"></span>
         </div>
       </div>
 
-      <div class="findings" x-show="smartFindings('revenue').length" x-cloak>
+      <div class="findings" x-show="smartFindings('analytics').length" x-cloak>
         <div class="findings-head">
           <span class="findings-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M12 3a4 4 0 014 4c0 1.5-.8 2.8-2 3.4V12h2a4 4 0 014 4v1H4v-1a4 4 0 014-4h2v-1.6C8.8 9.8 8 8.5 8 7a4 4 0 014-4z"/></svg></span>
-          <span class="findings-title">Co widzę i co bym zrobił</span>
+          <span class="findings-title">Okiem doradcy</span>
         </div>
-        <template x-for="(f, fi) in smartFindings('revenue')" :key="fi">
+        <template x-for="(f, fi) in smartFindings('analytics')" :key="fi">
           <div class="finding">
             <span class="finding-dot" :class="f.tone"></span>
             <span class="finding-text" x-text="f.text"></span>
@@ -1269,39 +1397,28 @@
           </div>
         </template>
       </div>
-      <div class="data-divider" x-show="smartFindings('revenue').length">Dane szczegółowe</div>
 
-      <!-- Week comparison KPIs -->
-      <div class="grid g-4" style="margin-bottom:16px;">
-        <div class="card">
-          <div class="kpi-label">Ostatnie 7 dni</div>
-          <div class="kpi-value num" x-text="fmtPLN(week.cur)"></div>
-          <div class="kpi-meta">
-            <span x-show="week.delta != null" :class="week.delta >= 0 ? 'delta-up' : 'delta-down'"
-                  x-text="(week.delta>=0?'+':'') + week.delta + '%'"></span>
-            <span>vs poprzednie 7 dni</span>
+      <div class="data-divider" x-show="smartFindings('analytics').length">Dane szczegółowe</div>
+
+      <!-- Insight strip — rule-based, computed from real data -->
+      <div class="insights" x-show="insights.length">
+        <template x-for="ins in insights" :key="ins.text">
+          <div class="insight">
+            <span class="insight-mark"></span>
+            <span x-html="ins.html"></span>
           </div>
-        </div>
-        <div class="card">
-          <div class="kpi-label">Poprzednie 7 dni</div>
-          <div class="kpi-value num" x-text="fmtPLN(week.prev)"></div>
-          <div class="kpi-meta"><span>okres porównawczy</span></div>
-        </div>
-        <div class="card">
-          <div class="kpi-label">Najlepszy dzień tygodnia</div>
-          <div class="kpi-value" style="font-size:24px;" x-text="bestDow ? plDay(bestDow.dow) : '—'"></div>
-          <div class="kpi-meta"><span class="num" x-text="bestDow ? '~' + fmtPLNc(bestDow.avg_day_revenue) + ' / dzień' : ''"></span></div>
-        </div>
-        <div class="card">
-          <div class="kpi-label">Najsłabszy dzień tygodnia</div>
-          <div class="kpi-value" style="font-size:24px;" x-text="worstDow ? plDay(worstDow.dow) : '—'"></div>
-          <div class="kpi-meta"><span class="num" x-text="worstDow ? '~' + fmtPLNc(worstDow.avg_day_revenue) + ' / dzień' : ''"></span></div>
-        </div>
+        </template>
       </div>
 
+      <!-- Main revenue chart (period follows the page selector) -->
       <div class="card" style="margin-bottom:16px;">
-        <div class="card-head"><span class="card-title">Przychód dzienny · 90 dni</span></div>
-        <div class="chart-wrap" style="height:280px;"><canvas id="chRev90"></canvas></div>
+        <div class="card-head">
+          <span class="card-title" x-text="'Dzienny przychód · ' + anDays + ' dni'"></span>
+        </div>
+        <div class="chart-wrap" style="height:280px;">
+          <canvas id="chRevenue"></canvas>
+        </div>
+        <div class="empty" x-show="dataReady && !daily.length">Brak sprzedaży w tym okresie.</div>
       </div>
 
       <div class="card" style="margin-bottom:16px;">
@@ -1315,13 +1432,28 @@
         <div class="empty" x-show="dataReady && !monthly.length">Brak danych miesięcznych.</div>
       </div>
 
-      <div class="grid g-2" style="margin-bottom:16px;">
+      <!-- Secondary row -->
+      <div class="grid g-3" style="margin-bottom:16px;">
         <div class="card">
-          <div class="card-head"><span class="card-title">Średni przychód wg dnia tygodnia · 90 dni</span></div>
-          <div class="chart-wrap" style="height:240px;"><canvas id="chDow"></canvas></div>
+          <div class="card-head"><span class="card-title" x-text="'Rozkład godzinowy · ' + anDays + ' dni'"></span></div>
+          <div class="chart-wrap" style="height:210px;"><canvas id="chHourly"></canvas></div>
         </div>
         <div class="card">
-          <div class="card-head"><span class="card-title">Zespół · 30 dni</span></div>
+          <div class="card-head"><span class="card-title" x-text="'Wg dnia tygodnia · ' + anDays + ' dni'"></span></div>
+          <div class="chart-wrap" style="height:210px;"><canvas id="chDow"></canvas></div>
+        </div>
+        <div class="card">
+          <div class="card-head"><span class="card-title" x-text="'Kanały sprzedaży · ' + anDays + ' dni'"></span></div>
+          <div class="chart-wrap" style="height:210px;"><canvas id="chChannels"></canvas></div>
+          <div class="empty" x-show="dataReady && !channels.length">Brak danych o kanałach.</div>
+        </div>
+      </div>
+
+      <!-- Zespół -->
+      <div class="section-label">Zespół</div>
+      <div class="grid g-2">
+        <div class="card">
+          <div class="card-head"><span class="card-title" x-text="'Sprzedaż zespołu · ' + anDays + ' dni'"></span></div>
           <table>
             <thead><tr><th>Pracownik</th><th class="r">Zamówienia</th><th class="r">Przychód</th><th class="r">Śr. rachunek</th></tr></thead>
             <tbody>
@@ -1337,6 +1469,33 @@
           </table>
           <div class="empty" x-show="dataReady && !employees.length">Brak danych o pracownikach.</div>
         </div>
+        <div class="card">
+          <div class="card-head">
+            <span class="card-title" x-text="'Koszty pracy · ' + anDays + ' dni'"></span>
+            <span class="num" style="font-size:13px;" x-show="labor?.has_data"
+                  :style="`color:${(labor?.labor_pct||0) <= 35 ? 'var(--pos)' : 'var(--neg)'}`"
+                  x-text="fmtPLN(labor?.total_cost) + (labor?.labor_pct != null ? ' · ' + labor.labor_pct + '%' : '')"></span>
+          </div>
+          <template x-if="labor?.has_data">
+            <table>
+              <thead><tr><th>Pracownik</th><th class="r">Zmiany</th><th class="r">Godziny</th><th class="r">Stawka</th><th class="r">Koszt</th></tr></thead>
+              <tbody>
+                <template x-for="e in (labor?.by_employee||[])" :key="e.employee">
+                  <tr>
+                    <td class="strong" x-text="e.employee"></td>
+                    <td class="r num" x-text="e.shifts"></td>
+                    <td class="r num" x-text="e.hours + ' h'"></td>
+                    <td class="r num" x-text="e.avg_rate ? fmtPLNc(e.avg_rate) + '/h' : '—'"></td>
+                    <td class="r num" style="color:var(--warn);" x-text="fmtPLNc(e.cost)"></td>
+                  </tr>
+                </template>
+              </tbody>
+            </table>
+          </template>
+          <div class="empty" x-show="dataReady && !labor?.has_data">
+            Brak danych z grafików GoPOS (RCP) za ten okres — zysk netto liczy koszty pracy z kwoty deklarowanej w audycie.
+          </div>
+        </div>
       </div>
     </div>
 
@@ -1344,16 +1503,20 @@
     <div x-show="tab==='menu'" x-cloak class="page fade">
       <div class="page-head">
         <div>
-          <h1>Menu &amp; Food Cost</h1>
-          <div class="page-sub">Wyniki dań, marże i struktura kosztów</div>
+          <h1>Menu</h1>
         </div>
-        <button class="btn" @click="loadMenuData()">↻ Odśwież</button>
+        <div class="seg">
+          <button :class="menuTab==='analysis' && 'on'" @click="menuTab='analysis'; $nextTick(() => renderMenu())">Analiza</button>
+          <button :class="menuTab==='recipes' && 'on'" @click="menuTab='recipes'">Receptury</button>
+        </div>
       </div>
+
+      <div x-show="menuTab==='analysis'">
 
       <div class="findings" x-show="smartFindings('menu').length" x-cloak>
         <div class="findings-head">
           <span class="findings-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M12 3a4 4 0 014 4c0 1.5-.8 2.8-2 3.4V12h2a4 4 0 014 4v1H4v-1a4 4 0 014-4h2v-1.6C8.8 9.8 8 8.5 8 7a4 4 0 014-4z"/></svg></span>
-          <span class="findings-title">Co widzę i co bym zrobił</span>
+          <span class="findings-title">Okiem doradcy</span>
         </div>
         <template x-for="(f, fi) in smartFindings('menu')" :key="fi">
           <div class="finding">
@@ -1393,40 +1556,8 @@
         </div>
       </div>
 
-      <div class="grid g-4" style="margin-bottom:8px;" x-show="netProfit">
-        <div class="card">
-          <div class="kpi-label">Przychód · 30 dni</div>
-          <div class="kpi-value num" style="font-size:24px;" x-text="fmtPLN(netProfit?.revenue)"></div>
-        </div>
-        <div class="card">
-          <div class="kpi-label">Food cost</div>
-          <div class="kpi-value num" style="font-size:24px; color:var(--neg);" x-text="fmtPLN(netProfit?.food_cost)"></div>
-          <div class="kpi-meta"><span x-text="(netProfit?.food_cost_pct||0) + '%'"></span></div>
-        </div>
-        <div class="card" x-show="netProfit?.labor_has_data">
-          <div class="kpi-label">Koszty pracy</div>
-          <div class="kpi-value num" style="font-size:24px; color:var(--warn);" x-text="fmtPLN(netProfit?.labor_cost)"></div>
-          <div class="kpi-meta"><span x-text="netProfit?.labor_pct != null ? netProfit.labor_pct + '%' : ''"></span></div>
-        </div>
-        <div class="card">
-          <div class="kpi-label">Koszty stałe</div>
-          <div class="kpi-value num" style="font-size:24px; color:var(--warn);" x-text="fmtPLN(netProfit?.overhead)"></div>
-        </div>
-        <div class="card" x-show="!netProfit?.labor_has_data">
-          <div class="kpi-label">Zysk netto</div>
-          <div class="kpi-value num" style="font-size:24px;" :style="`color:${(netProfit?.net_profit||0)>=0?'var(--pos)':'var(--neg)'}`" x-text="fmtPLN(netProfit?.net_profit)"></div>
-          <div class="kpi-meta"><span x-text="'marża ' + (netProfit?.net_margin_pct||0) + '%'"></span></div>
-        </div>
-      </div>
-      <div class="grid g-4" style="margin-bottom:8px;" x-show="netProfit?.labor_has_data">
-        <div class="card" style="grid-column: span 4; display:flex; align-items:center; justify-content:space-between;">
-          <span class="kpi-label">Zysk netto · 30 dni (przychód − food cost − praca − koszty stałe)</span>
-          <span class="kpi-value num" style="font-size:24px; margin:0;"
-                :style="`color:${(netProfit?.net_profit||0)>=0?'var(--pos)':'var(--neg)'}`"
-                x-text="fmtPLN(netProfit?.net_profit) + '  ·  marża ' + (netProfit?.net_margin_pct||0) + '%'"></span>
-        </div>
-      </div>
-      <div class="card" style="margin-bottom:16px; border-color: rgba(251,191,36,.35);" x-show="netProfit?.double_count_warning">
+      <!-- P&L usunięty z Menu — pełny rachunek zysku mieszka w Analityce -->
+      <div class="card" style="margin-bottom:16px; border-color: rgba(237,180,88,.35);" x-show="netProfit?.double_count_warning">
         <span style="font-size:13px; color:var(--warn);" x-text="netProfit?.double_count_warning"></span>
       </div>
 
@@ -1435,7 +1566,7 @@
         <div class="card-head">
           <span class="card-title">Menu Engineering — popularność × marża · 30 dni</span>
           <div style="display:flex; gap:14px; font-size:11.5px; color:var(--text-3);">
-            <span>⭐ Gwiazdy</span><span>🐴 Konie robocze</span><span>🧩 Zagadki</span><span>🐕 Psy</span>
+            <span><i class="qdot star"></i>Gwiazdy</span><span><i class="qdot plowhorse"></i>Konie robocze</span><span><i class="qdot puzzle"></i>Zagadki</span><span><i class="qdot dog"></i>Psy</span>
           </div>
         </div>
         <div class="grid g-23">
@@ -1445,8 +1576,7 @@
               <div style="padding:8px 10px; border-bottom:1px solid var(--border); font-size:12.5px;">
                 <div style="display:flex; justify-content:space-between; align-items:baseline;">
                   <span class="strong" style="color:var(--text);">
-                    <span x-text="quadEmoji(a.quadrant)"></span>
-                    <span x-text="a.item_name"></span>
+                    <i class="qdot" :class="a.quadrant"></i><span x-text="a.item_name"></span>
                   </span>
                   <span class="num" style="color:var(--text-3);"
                         x-text="Math.round(a.units) + ' szt · marża ' + (a.margin_pct ?? '—') + '%'"></span>
@@ -1486,10 +1616,11 @@
             </tr></thead>
             <tbody>
               <template x-for="(it, i) in allItems.slice(0,25)" :key="it.item_name">
-                <tr>
+                <tr style="cursor:pointer;" title="Kliknij, by edytować recepturę"
+                    @click="menuTab='recipes'; if (recipes.find(r => r.dish_name === it.item_name)) { openRecipe(it.item_name); } else { openRecipe(); form.dish_name = it.item_name; matchProduct(); }">
                   <td style="color:var(--text-3);" x-text="i+1"></td>
                   <td class="strong">
-                    <span x-text="engOf(it.item_name) ? quadEmoji(engOf(it.item_name).quadrant) + ' ' : ''"></span><span x-text="it.item_name"></span>
+                    <i class="qdot" x-show="engOf(it.item_name)" :class="engOf(it.item_name)?.quadrant"></i><span x-text="it.item_name"></span>
                     <div style="font-size:10.5px; color:var(--text-3);" x-text="it.category || ''"></div>
                   </td>
                   <td class="r num" x-text="fmtInt(it.total_units)"></td>
@@ -1505,10 +1636,7 @@
               </template>
             </tbody>
           </table>
-          <div style="font-size:11.5px; color:var(--text-3); margin-top:10px;">
-            „—" = brak receptury · FC% liczone od ceny netto · cel branżowy: ≤32% <span style="color:var(--pos);">●</span>
-            33–40% <span style="color:var(--warn);">●</span> &gt;40% <span style="color:var(--neg);">●</span>
-          </div>
+          <div style="font-size:11px; color:var(--text-3); margin-top:10px;">— = brak receptury · cel food cost ≤ 32%</div>
         </div>
 
         <div style="display:flex; flex-direction:column; gap:16px;">
@@ -1522,7 +1650,7 @@
                     <span style="color:var(--text-2);" x-text="c.category"></span>
                     <span class="num" style="color:var(--text);" x-text="fmtPLNc(c.revenue)"></span>
                   </div>
-                  <div style="height:4px; border-radius:2px; background:var(--border);">
+                  <div style="height:4px; border-radius:2px; background:var(--surface-2);">
                     <div style="height:100%; border-radius:2px; background:var(--accent); opacity:.85;"
                          :style="`width:${categories[0]?.revenue ? c.revenue/categories[0].revenue*100 : 0}%`"></div>
                   </div>
@@ -1533,8 +1661,8 @@
           </div>
 
           <!-- Attention -->
-          <div class="card" style="border-color: rgba(251,191,36,.25);">
-            <div class="card-head"><span class="card-title" style="color:var(--warn);">⚠ Wymaga uwagi</span></div>
+          <div class="card" style="border-color: rgba(237,180,88,.25);">
+            <div class="card-head"><span class="card-title" style="color:var(--warn);">Wymaga uwagi</span></div>
             <div style="display:flex; flex-direction:column; gap:12px; font-size:12.5px;">
               <div x-show="(menuOverview?.high_food_cost||[]).length">
                 <div style="color:var(--text-3); font-size:11px; text-transform:uppercase; letter-spacing:.08em; margin-bottom:4px;">Food cost &gt; 40%</div>
@@ -1575,131 +1703,7 @@
           </div>
         </div>
       </div>
-    </div>
-
-    <!-- ──────────────── OPERATIONS ──────────────── -->
-    <div x-show="tab==='operations'" x-cloak class="page fade">
-      <div class="page-head">
-        <div>
-          <h1>Operacje</h1>
-          <div class="page-sub">Godziny szczytu, obciążenie i wydajność</div>
-        </div>
-      </div>
-
-      <div class="findings" x-show="smartFindings('operations').length" x-cloak>
-        <div class="findings-head">
-          <span class="findings-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M12 3a4 4 0 014 4c0 1.5-.8 2.8-2 3.4V12h2a4 4 0 014 4v1H4v-1a4 4 0 014-4h2v-1.6C8.8 9.8 8 8.5 8 7a4 4 0 014-4z"/></svg></span>
-          <span class="findings-title">Co widzę i co bym zrobił</span>
-        </div>
-        <template x-for="(f, fi) in smartFindings('operations')" :key="fi">
-          <div class="finding">
-            <span class="finding-dot" :class="f.tone"></span>
-            <span class="finding-text" x-text="f.text"></span>
-            <button class="finding-act" @click="doFinding(f.action)" x-text="f.action.label"></button>
-          </div>
-        </template>
-      </div>
-      <div class="data-divider" x-show="smartFindings('operations').length">Dane szczegółowe</div>
-
-      <div class="grid g-4" style="margin-bottom:16px;">
-        <div class="card">
-          <div class="kpi-label">Godzina szczytu</div>
-          <div class="kpi-value num" x-text="peakHour ? peakHour.hour + ':00' : '—'"></div>
-          <div class="kpi-meta"><span class="num" x-text="peakHour ? fmtPLNc(peakHour.revenue) + ' / 14 dni' : ''"></span></div>
-        </div>
-        <div class="card">
-          <div class="kpi-label">Zamówień w szczycie</div>
-          <div class="kpi-value num" x-text="peakHour ? fmtInt(peakHour.orders) : '—'"></div>
-          <div class="kpi-meta"><span>w ciągu 14 dni</span></div>
-        </div>
-        <div class="card">
-          <div class="kpi-label">Godziny aktywne</div>
-          <div class="kpi-value num" x-text="hourly.filter(h=>h.orders>0).length || '—'"></div>
-          <div class="kpi-meta"><span>z obrotem &gt; 0</span></div>
-        </div>
-        <div class="card">
-          <div class="kpi-label">Udział szczytu</div>
-          <div class="kpi-value num" x-text="peakShare != null ? peakShare + '%' : '—'"></div>
-          <div class="kpi-meta"><span>top 3 godziny vs całość</span></div>
-        </div>
-      </div>
-
-      <div class="grid g-2" style="margin-bottom:16px;">
-        <div class="card">
-          <div class="card-head"><span class="card-title">Przychód i zamówienia wg godziny · 14 dni</span></div>
-          <div class="chart-wrap" style="height:260px;"><canvas id="chOpsHourly"></canvas></div>
-        </div>
-        <div class="card">
-          <div class="card-head"><span class="card-title">Zamówienia wg dnia tygodnia · 90 dni</span></div>
-          <div class="chart-wrap" style="height:260px;"><canvas id="chOpsDow"></canvas></div>
-        </div>
-      </div>
-
-      <!-- Labor cost -->
-      <div class="grid g-23" style="margin-bottom:16px;" x-show="labor?.has_data">
-        <div class="card">
-          <div class="card-head">
-            <span class="card-title">Koszty pracy wg pracownika · 30 dni</span>
-            <span class="num" style="font-size:13px;"
-                  :style="`color:${(labor?.labor_pct||0) <= 35 ? 'var(--pos)' : 'var(--neg)'}`"
-                  x-text="labor?.labor_pct != null ? labor.labor_pct + '% przychodu' : ''"></span>
-          </div>
-          <table>
-            <thead><tr><th>Pracownik</th><th class="r">Zmiany</th><th class="r">Godziny</th><th class="r">Stawka</th><th class="r">Koszt</th></tr></thead>
-            <tbody>
-              <template x-for="e in (labor?.by_employee||[])" :key="e.employee">
-                <tr>
-                  <td class="strong" x-text="e.employee"></td>
-                  <td class="r num" x-text="e.shifts"></td>
-                  <td class="r num" x-text="e.hours + ' h'"></td>
-                  <td class="r num" x-text="e.avg_rate ? fmtPLNc(e.avg_rate) + '/h' : '—'"></td>
-                  <td class="r num" style="color:var(--warn);" x-text="fmtPLNc(e.cost)"></td>
-                </tr>
-              </template>
-            </tbody>
-          </table>
-        </div>
-        <div class="card">
-          <div class="card-head"><span class="card-title">Praca · podsumowanie 30 dni</span></div>
-          <div style="display:flex; flex-direction:column; gap:14px;">
-            <div>
-              <div class="kpi-label">Łączny koszt pracy</div>
-              <div class="kpi-value num" style="font-size:26px; color:var(--warn);" x-text="fmtPLN(labor?.total_cost)"></div>
-            </div>
-            <div>
-              <div class="kpi-label">Przepracowane godziny</div>
-              <div class="kpi-value num" style="font-size:26px;" x-text="labor?.total_hours ? labor.total_hours + ' h' : '—'"></div>
-            </div>
-            <div>
-              <div class="kpi-label">Labor cost % (cel 25–35%)</div>
-              <div class="kpi-value num" style="font-size:26px;"
-                   :style="`color:${(labor?.labor_pct||0) <= 35 ? 'var(--pos)' : 'var(--neg)'}`"
-                   x-text="labor?.labor_pct != null ? labor.labor_pct + '%' : '—'"></div>
-            </div>
-          </div>
-        </div>
-      </div>
-      <div class="card" style="margin-bottom:16px;" x-show="dataReady && !labor?.has_data">
-        <div class="empty">
-          Brak danych o grafikach pracy. Jeśli rejestrujecie zmiany w GoPOS (check-in/out pracowników),
-          uruchom ponownie synchronizację lub pełną historię — koszty pracy policzą się automatycznie.
-        </div>
-      </div>
-
-      <div class="card">
-        <div class="card-head">
-          <span class="card-title">Zapytaj agenta operacyjnego</span>
-        </div>
-        <div style="display:flex; gap:8px;">
-          <input class="input" placeholder="Np. „Czy obsada w piątki jest wystarczająca względem ruchu?”"
-                 x-model="opsQ" @keyup.enter="askOps()">
-          <button class="btn primary" @click="askOps()" :disabled="opsLoading">
-            <span x-show="opsLoading" class="spinner"></span>
-            <span x-text="opsLoading ? '' : 'Zapytaj'"></span>
-          </button>
-        </div>
-        <div class="bubble-a md" style="margin-top:14px; max-width:100%;" x-show="opsA" x-html="md(opsA)"></div>
-      </div>
+      </div><!-- /menuTab analysis -->
     </div>
 
     <!-- ──────────────── CHAT ──────────────── -->
@@ -1713,17 +1717,70 @@
         <div class="agent-row">
           <template x-for="a in agents" :key="a.id">
             <button class="agent-pill" :class="agent===a.id && 'on'" @click="agent=a.id" :title="a.description"
-                    x-text="a.icon + ' ' + a.name"></button>
+                    x-text="a.name"></button>
           </template>
-          <button class="agent-pill" :class="showMemories && 'on'" @click="toggleMemories()" title="Pamięć długoterminowa CEO">🧠</button>
+          <button class="agent-pill" :class="showMemories && 'on'" @click="toggleMemories()" title="Pamięć długoterminowa" aria-label="Pamięć">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M19 21l-7-4-7 4V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg>
+          </button>
+          <button class="agent-pill" :class="showThreads && 'on'" @click="toggleThreads()" title="Historia rozmów" aria-label="Historia">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
+          </button>
+          <button class="agent-pill" :class="showNarada && 'on'" @click="showNarada = !showNarada; if (showNarada) { showThreads = false; showMemories = false; }"
+                  title="Narada doradców" aria-label="Narada">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+          </button>
         </div>
+      </div>
+
+      <!-- Narada doradców panel -->
+      <div x-show="showNarada" x-cloak style="border-bottom:1px solid var(--border); background:var(--card); padding:14px 28px; max-height:46vh; overflow-y:auto;">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+          <span class="card-title">Narada doradców</span>
+          <button class="btn" style="padding:5px 12px; font-size:12px;" @click="genBrief()" :disabled="briefLoading">
+            <span x-show="briefLoading" class="spinner" style="width:11px;height:11px;"></span>
+            <span x-text="briefLoading ? 'Pięciu agentów analizuje…' : (brief ? 'Powtórz naradę' : 'Rozpocznij naradę')"></span>
+          </button>
+        </div>
+        <div x-show="!brief && !briefLoading" style="font-size:12.5px; color:var(--text-3);">
+          Finanse · Menu · Wzrost · Operacje · synteza CEO — głęboka analiza z priorytetami na tydzień (30–60 s).
+        </div>
+        <template x-if="brief && !briefLoading">
+          <div>
+            <div class="md" style="font-size:13px; padding:10px 0; border-bottom:1px solid var(--border);" x-html="md(brief.summary)"></div>
+            <template x-for="s in [['financial','Finanse'],['menu','Menu i koszty'],['growth','Wzrost'],['operations','Operacje']]" :key="s[0]">
+              <details style="padding:8px 0; border-bottom:1px solid var(--border);" x-show="brief[s[0]]">
+                <summary style="cursor:pointer; font-size:13px; font-weight:600; color:var(--text-2);" x-text="s[1]"></summary>
+                <div class="md" style="font-size:12.5px; margin-top:8px;" x-html="md(brief[s[0]])"></div>
+              </details>
+            </template>
+          </div>
+        </template>
+      </div>
+
+      <!-- Conversation history panel -->
+      <div x-show="showThreads" x-cloak style="border-bottom:1px solid var(--border); background:var(--card); padding:14px 28px; max-height:260px; overflow-y:auto;">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+          <span class="card-title">Historia rozmów (<span x-text="chatThreads.length"></span>)</span>
+          <span style="font-size:11px; color:var(--text-3);">archiwum po 12 h ciszy</span>
+        </div>
+        <div x-show="!chatThreads.length" style="font-size:12.5px; color:var(--text-3);">
+          Pusto. Zakończone rozmowy pojawią się tutaj — możesz do nich wrócić.
+        </div>
+        <template x-for="t in chatThreads" :key="t.thread_id">
+          <div @click="openThread(t)"
+               style="display:flex; gap:10px; align-items:baseline; padding:8px 0; font-size:12.5px; border-bottom:1px solid var(--border); cursor:pointer;">
+            <span style="color:var(--text-3); font-size:11px; min-width:88px;" class="num" x-text="threadDate(t)"></span>
+            <span style="flex:1; color:var(--text-2); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;" x-text="t.title"></span>
+            <span style="color:var(--text-3); font-size:11px;" x-text="t.count + ' wiad.'"></span>
+          </div>
+        </template>
       </div>
 
       <!-- Memory panel -->
       <div x-show="showMemories" x-cloak style="border-bottom:1px solid var(--border); background:var(--card); padding:14px 28px; max-height:220px; overflow-y:auto;">
         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
-          <span class="card-title">Pamięć długoterminowa CEO (<span x-text="memories.length"></span>)</span>
-          <span style="font-size:11.5px; color:var(--text-3);">Agent zapisuje tu fakty z rozmów — przetrwają restart</span>
+          <span class="card-title">Pamięć (<span x-text="memories.length"></span>)</span>
+          <span style="font-size:11px; color:var(--text-3);">fakty zapamiętane z rozmów</span>
         </div>
         <div x-show="!memories.length" style="font-size:12.5px; color:var(--text-3);">
           Pusto. Powiedz CEO coś ważnego (np. „nasz cel to 25% marży do grudnia") — zapamięta.
@@ -1746,8 +1803,7 @@
             <div class="msg-col">
               <div class="msg-name" x-text="agentName(agent)"></div>
               <div class="bubble-a">
-                <p style="color:var(--text); margin-top:0;">Cześć! Jestem Twoim doradcą i znam Twoje dane z GoPOS.</p>
-                <p style="margin-bottom:0;">Zapytaj mnie o cokolwiek — przychody, menu, koszty, plan na tydzień. Na górze możesz wybrać specjalistę (finanse, menu, wzrost, operacje).</p>
+                <p style="color:var(--text); margin:0;">Cześć! Znam Twoje liczby na żywo — zapytaj o cokolwiek.</p>
               </div>
             </div>
           </div>
@@ -1793,93 +1849,120 @@
         <input class="input" placeholder="Zadaj pytanie o swój biznes…" x-model="msg"
                @keyup.enter="send(msg)" :disabled="chatLoading">
         <button class="btn primary" @click="send(msg)" :disabled="chatLoading || !msg.trim()">Wyślij</button>
-        <button class="btn ghost" @click="clearWebChat()" title="Wyczyść historię (też z bazy)">✕</button>
-      </div>
-    </div>
-
-    <!-- ──────────────── BRIEFING ──────────────── -->
-    <div x-show="tab==='briefing'" x-cloak class="page fade">
-      <div class="page-head">
-        <div>
-          <h1>Narada doradców</h1>
-          <div class="page-sub">Głęboka analiza pięciu specjalistów ze wspólnymi priorytetami na tydzień — uzupełnienie szybkiego briefingu z „Dziś”</div>
-        </div>
-        <button class="btn primary" @click="genBrief()" :disabled="briefLoading">
-          <span x-show="briefLoading" class="spinner"></span>
-          <span x-text="briefLoading ? 'Generuję…' : 'Generuj briefing'"></span>
-        </button>
-      </div>
-
-      <div class="card" x-show="briefLoading" style="text-align:center; padding:56px;">
-        <div class="spinner" style="width:28px; height:28px; margin:0 auto 16px;"></div>
-        <div style="color:var(--text-2);">Pięciu agentów analizuje Twój biznes…</div>
-        <div style="color:var(--text-3); font-size:12.5px; margin-top:6px;">Zwykle 30–60 sekund</div>
-      </div>
-
-      <template x-if="brief && !briefLoading">
-        <div>
-          <div class="card brief-summary" style="margin-bottom:16px;">
-            <div class="card-head"><span class="card-title" style="color:var(--accent-2);">Podsumowanie CEO · priorytety tygodnia</span></div>
-            <div class="md" x-html="md(brief.summary)"></div>
-          </div>
-          <div class="grid g-2">
-            <template x-for="s in [['financial','Finanse'],['menu','Menu i koszty'],['growth','Wzrost'],['operations','Operacje']]" :key="s[0]">
-              <div class="card" x-show="brief[s[0]]">
-                <div class="card-head"><span class="card-title" x-text="s[1]"></span></div>
-                <div class="md" style="font-size:13px;" x-html="md(brief[s[0]])"></div>
-              </div>
-            </template>
-          </div>
-        </div>
-      </template>
-
-      <div class="card" x-show="!brief && !briefLoading" style="text-align:center; padding:64px;">
-        <div class="serif" style="font-size:20px; margin-bottom:8px;">Twój zespół doradców czeka</div>
-        <div style="color:var(--text-3); margin-bottom:22px;">Finanse · Menu · Wzrost · Operacje · synteza CEO</div>
-        <button class="btn primary" @click="genBrief()">Rozpocznij analizę</button>
+        <button class="btn ghost" @click="clearWebChat()" title="Nowa rozmowa — obecna trafi do historii">+</button>
       </div>
     </div>
 
     <!-- ──────────────── FAKTURY ──────────────── -->
-    <div x-show="tab==='invoices'" x-cloak class="page fade">
+    <div x-show="tab==='purchasing'" x-cloak class="page fade">
       <div class="page-head">
         <div>
-          <h1>Faktury</h1>
-          <div class="page-sub">Zrób zdjęcie faktury — AI odczyta dostawcę, kwoty i termin płatności</div>
+          <h1>Zakupy</h1>
         </div>
-        <label class="btn primary" style="cursor:pointer;">
-          <span x-show="!invoiceUploading">📷 Dodaj fakturę</span>
+        <div class="seg">
+          <button :class="buyTab==='invoices' && 'on'" @click="buyTab='invoices'">Faktury</button>
+          <button :class="buyTab==='products' && 'on'" @click="buyTab='products'">Ceny produktów</button>
+        </div>
+        <label class="btn primary" style="cursor:pointer;" x-show="buyTab==='invoices'">
+          <span x-show="!invoiceUploading" style="display:inline-flex; align-items:center; gap:7px;"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" style="width:14px;height:14px;"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>Dodaj fakturę</span>
           <span x-show="invoiceUploading" style="display:flex; align-items:center; gap:8px;"><span class="spinner"></span> Odczytuję…</span>
           <input type="file" accept="image/*,application/pdf" style="display:none" @change="uploadInvoice($event)" :disabled="invoiceUploading">
         </label>
       </div>
 
-      <!-- summary -->
-      <div class="grid g-4" style="margin-bottom:18px;">
-        <div class="card">
-          <div class="kpi-label">Do zapłaty</div>
-          <div class="kpi-value num" :style="invoiceTotals?.unpaid_count ? 'color:var(--warn)' : ''" x-text="(invoiceTotals?.unpaid_count||0)"></div>
-          <div class="kpi-meta">niezapłaconych faktur</div>
+      <div x-show="buyTab==='invoices'">
+      <!-- empty state: sell the value + one clear CTA -->
+      <div class="card" x-show="invoices && invoices.length === 0" x-cloak style="text-align:center; padding:40px 24px;">
+        <div class="empty-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" style="width:22px;height:22px;"><path d="M6 2h9l5 5v15H6z"/><path d="M14 2v6h6M9 13h6M9 17h6"/></svg></div>
+        <div class="serif" style="font-size:18px; font-weight:600; margin-bottom:8px;">Dodaj pierwszą fakturę</div>
+        <div style="font-size:13.5px; color:var(--text-2); line-height:1.6; max-width:34ch; margin:0 auto 20px;">
+          Zdjęcie wystarczy — AI odczyta pozycje, policzy <b style="color:var(--text);">realny food cost</b>
+          i ostrzeże, gdy coś podrożeje.
         </div>
-        <div class="card">
-          <div class="kpi-label">Kwota do zapłaty</div>
-          <div class="kpi-value num" x-text="fmtPLN(invoiceTotals?.unpaid_amount||0)"></div>
+        <label class="btn primary" style="cursor:pointer; display:inline-flex; align-items:center; gap:8px;">
+          <span x-show="!invoiceUploading" style="display:inline-flex; align-items:center; gap:7px;"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" style="width:14px;height:14px;"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>Dodaj fakturę</span>
+          <span x-show="invoiceUploading" style="display:flex; align-items:center; gap:8px;"><span class="spinner"></span> Odczytuję…</span>
+          <input type="file" accept="image/*,application/pdf" style="display:none" @change="uploadInvoice($event)" :disabled="invoiceUploading">
+        </label>
+        <div style="font-size:11.5px; color:var(--text-3); margin-top:14px;">Im więcej faktur dodasz, tym mądrzejsze ostrzeżenia o cenach.</div>
+      </div>
+
+      <!-- czujka cen: co podrożało + gdzie przepłacasz -->
+      <div class="card" x-show="(priceSignals?.increases?.length || priceSignals?.overpaying?.length)" x-cloak style="margin-bottom:18px;">
+        <div class="card-head"><span class="card-title">Czujka cen</span>
+          <span style="font-size:11.5px; color:var(--text-3);">z Twoich faktur</span>
         </div>
-        <div class="card">
-          <div class="kpi-label">Najbliższy termin</div>
-          <div class="kpi-value num" style="font-size:20px;" x-text="invoiceTotals?.nearest_due ? fmtDateShort(invoiceTotals.nearest_due) : '—'"></div>
-          <div class="kpi-meta" x-show="invoiceTotals?.nearest_due" x-text="dueLabel(invoiceTotals?.nearest_due)"></div>
+
+        <div x-show="priceSignals?.increases?.length" style="margin-bottom:14px;">
+          <div style="font-size:12px; color:var(--text-3); margin-bottom:8px;">Podrożało u Twojego dostawcy</div>
+          <div style="display:flex; flex-direction:column; gap:8px;">
+            <template x-for="(s, si) in (priceSignals?.increases||[])" :key="'inc'+si">
+              <div style="display:flex; align-items:center; gap:10px; padding:10px 12px; background:var(--card-2); border-radius:10px;">
+                <span style="flex:1; min-width:0;">
+                  <span style="font-size:13px; color:var(--text);" x-text="s.ingredient"></span>
+                  <span style="font-size:11.5px; color:var(--text-3); display:block;"
+                        x-text="fmtZl2(s.from) + ' → ' + fmtZl2(s.to) + (s.unit ? ' / '+s.unit : '') + (s.supplier ? ' · '+s.supplier : '')"></span>
+                </span>
+                <span class="num" style="font-size:13px; font-weight:600; color:var(--danger-ink); white-space:nowrap;"
+                      x-text="'+' + s.pct + '%'"></span>
+              </div>
+            </template>
+          </div>
         </div>
-        <div class="card">
-          <div class="kpi-label">Faktur łącznie</div>
-          <div class="kpi-value num" x-text="(invoices?.length||0)"></div>
+
+        <div x-show="priceSignals?.overpaying?.length">
+          <div style="font-size:12px; color:var(--text-3); margin-bottom:8px;">Taniej u innego dostawcy</div>
+          <div style="display:flex; flex-direction:column; gap:8px;">
+            <template x-for="(s, si) in (priceSignals?.overpaying||[])" :key="'ovp'+si">
+              <div style="display:flex; align-items:center; gap:10px; padding:10px 12px; background:var(--card-2); border-radius:10px;">
+                <span style="flex:1; min-width:0;">
+                  <span style="font-size:13px; color:var(--text);" x-text="s.ingredient"></span>
+                  <span style="font-size:11.5px; color:var(--text-3); display:block;"
+                        x-text="'płacisz ' + fmtZl2(s.you_pay) + ' u ' + s.you_supplier + ' · taniej ' + fmtZl2(s.cheaper) + ' u ' + s.cheaper_supplier"></span>
+                </span>
+                <span class="num" style="font-size:13px; font-weight:600; color:var(--ok-ink); white-space:nowrap;"
+                      x-text="'-' + s.save_pct + '%'"></span>
+              </div>
+            </template>
+          </div>
         </div>
+      </div>
+
+      <!-- unpaid first (only once there are invoices; empty-state hero covers the zero case) -->
+      <div style="display:flex; justify-content:space-between; align-items:baseline; margin-bottom:10px;" x-show="invoices && invoices.length">
+        <span class="card-title">Do zapłaty</span>
+        <span style="font-size:12px; color:var(--text-3);" x-show="invoiceTotals?.unpaid_count"
+              x-text="fmtPLN(invoiceTotals?.unpaid_amount||0) + (invoiceTotals?.nearest_due ? ' · najbliższy termin: ' + dueLabel(invoiceTotals.nearest_due) : '')"></span>
+      </div>
+      <div class="grid g-2" x-show="unpaidInvoices.length">
+        <template x-for="inv in unpaidInvoices" :key="inv.id">
+          <div class="card invoice-card" @click="openInvoice(inv)">
+            <div style="display:flex; justify-content:space-between; gap:10px;">
+              <div style="min-width:0;">
+                <div class="strong" x-text="inv.supplier || 'Nieznany dostawca'"></div>
+                <div style="font-size:11.5px; color:var(--text-3); margin-top:2px;" x-text="(inv.invoice_number ? inv.invoice_number + ' · ' : '') + (inv.item_count||0) + ' poz.'"></div>
+              </div>
+              <span class="inv-due" :class="dueClass(inv.due_date)" x-text="inv.due_date ? dueLabel(inv.due_date) : 'brak terminu'"></span>
+            </div>
+            <div style="display:flex; align-items:baseline; justify-content:space-between; margin-top:12px;">
+              <span class="num" style="font-size:22px; font-weight:600;" x-text="fmtPLN(inv.total||0)"></span>
+              <button class="btn primary" style="padding:6px 14px; font-size:12.5px;" @click.stop="payInvoice(inv)">Opłacone ✓</button>
+            </div>
+          </div>
+        </template>
+      </div>
+      <div class="card" x-show="invoices && invoices.length && !unpaidInvoices.length" style="text-align:center; padding:26px; color:var(--text-3);">
+        <span style="color:var(--pos);">✓</span> Wszystko opłacone
       </div>
 
       <!-- koszty + weryfikacja food costu -->
       <div class="card" x-show="invoiceCosts && invoiceCosts.summary?.invoice_count" x-cloak style="margin-bottom:18px;">
         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px;">
-          <div class="card-title">Koszty z faktur (30 dni)</div>
+          <div>
+            <div class="card-title">Koszty z faktur</div>
+            <div style="font-size:11px; color:var(--text-3); margin-top:1px;"
+                 x-text="invoiceCosts?.summary?.period_from ? ('okres: ' + fmtDateShort(invoiceCosts.summary.period_from) + ' – ' + fmtDateShort(invoiceCosts.summary.period_to)) : 'ostatnie 30 dni'"></div>
+          </div>
           <div class="num strong" x-text="fmtPLN(invoiceCosts?.summary?.total||0)"></div>
         </div>
         <div style="display:flex; flex-direction:column; gap:8px;">
@@ -1913,28 +1996,11 @@
         </div>
       </div>
 
-      <!-- unpaid first -->
-      <div class="card-title" style="margin-bottom:10px;">Do zapłaty</div>
-      <div class="grid g-2" x-show="unpaidInvoices.length">
-        <template x-for="inv in unpaidInvoices" :key="inv.id">
-          <div class="card invoice-card" @click="openInvoice(inv)">
-            <div style="display:flex; justify-content:space-between; gap:10px;">
-              <div style="min-width:0;">
-                <div class="strong" x-text="inv.supplier || 'Nieznany dostawca'"></div>
-                <div style="font-size:11.5px; color:var(--text-3); margin-top:2px;" x-text="(inv.invoice_number ? inv.invoice_number + ' · ' : '') + (inv.item_count||0) + ' poz.'"></div>
-              </div>
-              <span class="inv-due" :class="dueClass(inv.due_date)" x-text="inv.due_date ? dueLabel(inv.due_date) : 'brak terminu'"></span>
-            </div>
-            <div style="display:flex; align-items:baseline; justify-content:space-between; margin-top:12px;">
-              <span class="num" style="font-size:22px; font-weight:600;" x-text="fmtPLN(inv.total||0)"></span>
-              <button class="btn primary" style="padding:6px 14px; font-size:12.5px;" @click.stop="payInvoice(inv)">Opłacone ✓</button>
-            </div>
-          </div>
-        </template>
-      </div>
-      <div class="card" x-show="!unpaidInvoices.length" style="text-align:center; padding:26px; color:var(--text-3);">
-        Brak niezapłaconych faktur 🎉
-      </div>
+      <!-- ask advisor about invoice costs/prices — available whenever there are invoices -->
+      <button class="btn ghost" style="width:100%; margin-bottom:18px;" x-show="invoices && invoices.length"
+              @click="askAdvisor('Przeanalizuj moje koszty z faktur: czy realne wydatki na jedzenie pokrywają się z zakładanym food costem? Co podrożało, gdzie przepłacam i co konkretnie zrobić, żeby obniżyć koszty zakupów? Odpowiedz na podstawie moich faktur.')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" style="width:14px;height:14px; vertical-align:-2px; margin-right:6px;"><path d="M21 11.5a8.38 8.38 0 0 1-8.5 8.5 8.5 8.5 0 0 1-3.5-.76L3 21l1.76-6A8.5 8.5 0 1 1 21 11.5z"/></svg>Zapytaj doradcę o koszty i ceny
+      </button>
 
       <!-- paid -->
       <div class="card-title" style="margin:22px 0 10px;" x-show="paidInvoices.length">Zapłacone</div>
@@ -1953,6 +2019,7 @@
           </div>
         </template>
       </div>
+      </div><!-- /buyTab invoices -->
     </div>
 
     <!-- INVOICE DETAIL MODAL -->
@@ -1983,6 +2050,18 @@
               <span class="num" x-text="fmtPLN(invoiceDetail.total_net||0)"></span>
             </div>
 
+            <!-- original scan/photo — tap to open full size -->
+            <template x-if="invoiceDetail.has_image">
+              <div style="margin-top:16px;">
+                <div class="card-title" style="margin-bottom:8px;">Skan faktury <span x-show="invoiceDetail.is_pdf" style="font-size:11px; color:var(--text-3); font-weight:400;">· PDF (strona 1)</span></div>
+                <a :href="'/api/invoices/' + invoiceDetail.id + '/image'" target="_blank" rel="noopener" style="display:block;">
+                  <img :src="'/api/invoices/' + invoiceDetail.id + '/image'" alt="Skan faktury"
+                       loading="lazy"
+                       style="width:100%; max-height:300px; object-fit:contain; border-radius:12px; border:1px solid var(--border); background:var(--card-2);">
+                </a>
+              </div>
+            </template>
+
             <div class="card-title" style="margin:18px 0 8px;" x-show="invoiceDetail.items?.length">Pozycje</div>
             <div style="max-height:240px; overflow-y:auto;">
               <template x-for="(it, ii) in (invoiceDetail.items||[])" :key="ii">
@@ -2007,16 +2086,14 @@
     </div>
 
     <!-- ──────────────── RECIPES ──────────────── -->
-    <div x-show="tab==='recipes'" x-cloak class="page fade">
-      <div class="page-head">
-        <div>
-          <h1>Przepisy &amp; koszty</h1>
-          <div class="page-sub">Receptury dań i miesięczne koszty stałe — podstawa realnego zysku netto</div>
-        </div>
+    <div x-show="tab==='menu' && menuTab==='recipes'" x-cloak class="page fade" style="padding-top:0;">
+      <div class="page-head" style="margin-bottom:14px;">
+        <div></div>
         <div style="display:flex; gap:8px;">
           <label class="btn" style="cursor:pointer;">
             <span x-show="extracting" class="spinner"></span>
-            <span x-text="extracting ? 'AI analizuje menu…' : '📷 Importuj z menu (AI)'"></span>
+            <span x-show="!extracting" style="display:inline-flex; align-items:center; gap:7px;"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" style="width:14px;height:14px;"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>Skanuj menu (AI)</span>
+            <span x-show="extracting">AI analizuje menu…</span>
             <input type="file" accept="image/*" style="display:none;" @change="extractMenu($event)" :disabled="extracting">
           </label>
           <button class="btn primary" @click="openRecipe()">+ Nowy przepis</button>
@@ -2024,7 +2101,7 @@
       </div>
 
       <!-- AI extraction drafts -->
-      <div class="card" x-show="drafts.length" style="margin-bottom:16px; border-color: rgba(237,125,58,.3);">
+      <div class="card" x-show="drafts.length" style="margin-bottom:16px; border-color: var(--warn-soft);">
         <div class="card-head">
           <span class="card-title" style="color:var(--accent-2);">Propozycje AI z menu — sprawdź i zapisz (<span x-text="drafts.length"></span>)</span>
           <div style="display:flex; gap:8px;">
@@ -2055,12 +2132,12 @@
         </table>
       </div>
 
-      <div class="grid g-23">
+      <div>
         <div class="card">
           <div class="card-head">
             <span class="card-title">Przepisy (<span x-text="recipes.length"></span>)</span>
-            <span style="font-size:12px; color:var(--text-3);" x-show="suggestions.length"
-                  x-text="'Sugestie do uzupełnienia: ' + suggestions.slice(0,3).join(', ')"></span>
+            <span style="font-size:11.5px; color:var(--text-3);" x-show="suggestions.length"
+                  x-text="'brakuje: ' + suggestions.slice(0,2).join(', ') + (suggestions.length > 2 ? ' +' + (suggestions.length-2) : '')"></span>
           </div>
           <table>
             <thead><tr><th>Danie</th><th class="r">Cena</th><th class="r">Food cost</th><th class="r">Marża</th><th class="r" style="width:90px;"></th></tr></thead>
@@ -2125,34 +2202,143 @@
           </div>
         </div>
 
-        <div class="card">
-          <div class="card-head">
-            <span class="card-title">Koszty stałe / mies.</span>
-            <span class="num" style="font-size:13px; color:var(--text);" x-text="fmtPLNc(overheads.reduce((s,o)=>s+o.monthly_amount,0))"></span>
-          </div>
-          <div style="display:flex; flex-direction:column; gap:8px; margin-bottom:14px;">
-            <template x-for="o in overheads" :key="o.category">
-              <div style="display:flex; align-items:center; gap:10px; padding:9px 12px; background:var(--card-2); border-radius:9px;">
-                <span style="flex:1; font-size:13px; text-transform:capitalize;" x-text="o.category"></span>
-                <span class="num" style="font-size:13px; color:var(--text);" x-text="fmtPLNc(o.monthly_amount)"></span>
-                <button class="btn ghost danger" style="padding:1px 6px;" @click="delOverhead(o.category)">✕</button>
-              </div>
-            </template>
-            <div class="empty" x-show="!overheads.length" style="padding:18px;">Brak kosztów stałych.</div>
-          </div>
-          <div style="display:grid; grid-template-columns: 1.4fr 1fr auto; gap:8px;">
-            <input class="input" placeholder="np. czynsz" x-model="newOh.category">
-            <input class="input" type="number" placeholder="PLN / mies." x-model="newOh.amount">
-            <button class="btn" @click="addOverhead()">Dodaj</button>
-          </div>
+      </div>
+    </div>
+
+    <!-- ──────────────── PRODUKTY (ceny z faktur) ──────────────── -->
+    <div x-show="tab==='purchasing' && buyTab==='products'" x-cloak class="page fade" style="padding-top:0;">
+      <!-- empty -->
+      <div class="card" x-show="invProductsLoaded && !invProducts.length" style="text-align:center; padding:40px 24px;">
+        <div class="empty-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" style="width:22px;height:22px;"><path d="M20 7l-8-4-8 4 8 4 8-4z"/><path d="M4 7v10l8 4 8-4V7M12 11v10"/></svg></div>
+        <div class="serif" style="font-size:18px; font-weight:600; margin-bottom:8px;">Tu zbiorą się Twoje produkty</div>
+        <div style="font-size:13.5px; color:var(--text-2); line-height:1.6; max-width:34ch; margin:0 auto 18px;">
+          Z każdej faktury AI zapisze ceny — zobaczysz, co podrożało i gdzie kupisz taniej.
         </div>
+        <button class="btn primary" @click="go('invoices')">Dodaj fakturę →</button>
+      </div>
+
+      <!-- summary -->
+      <div class="grid g-4" x-show="invProducts.length" style="margin-bottom:16px;">
+        <div class="card"><div class="kpi-label">Produkty</div><div class="kpi-value num" x-text="invProducts.length"></div></div>
+        <div class="card"><div class="kpi-label">Podrożało</div><div class="kpi-value num" :style="priceSignals?.increases?.length?'color:var(--danger-ink)':''" x-text="priceSignals?.increases?.length||0"></div></div>
+        <div class="card"><div class="kpi-label">Przepłacasz</div><div class="kpi-value num" :style="priceSignals?.overpaying?.length?'color:var(--warn-ink)':''" x-text="priceSignals?.overpaying?.length||0"></div></div>
+        <div class="card"><div class="kpi-label">Dostawcy</div><div class="kpi-value num" x-text="new Set(invProducts.map(p=>p.latest_supplier).filter(Boolean)).size"></div></div>
+      </div>
+
+      <!-- category filter chips -->
+      <div x-show="invProducts.length" style="display:flex; gap:7px; overflow-x:auto; padding-bottom:4px; margin-bottom:12px; -webkit-overflow-scrolling:touch;">
+        <button class="chip" :class="productCat==='all' && 'on'" @click="productCat='all'"
+                x-text="'Wszystko · '+invProducts.length"></button>
+        <template x-for="c in productCats()" :key="c.key">
+          <button class="chip" :class="productCat===c.key && 'on'" @click="productCat=c.key" x-text="c.label+' · '+c.n"></button>
+        </template>
+      </div>
+
+      <!-- product list -->
+      <div x-show="invProducts.length" style="display:flex; flex-direction:column; gap:8px;">
+        <template x-for="(p, pi) in filteredProducts()" :key="p.name+pi">
+          <div class="card invoice-card" style="padding:12px 14px; cursor:pointer;" @click="productDetail=p">
+            <div style="display:flex; align-items:center; gap:12px;">
+              <div style="flex:1; min-width:0;">
+                <div style="font-size:14px; color:var(--text); overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" x-text="p.name"></div>
+                <div style="font-size:11.5px; color:var(--text-3); margin-top:2px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">
+                  <span x-show="productCat==='all'" x-text="p.category_label+' · '"></span><span x-text="p.latest_supplier || 'brak dostawcy'"></span><span x-show="p.supplier_count>1" x-text="' · '+p.supplier_count+' dostawców'"></span><span x-show="p.overpaying" style="color:var(--warn-ink);"> · taniej gdzie indziej</span>
+                </div>
+              </div>
+              <div style="text-align:right; flex-shrink:0;">
+                <div class="num" style="font-size:15px; font-weight:600;" x-text="fmtZl2(p.latest_price) + (p.unit?(' /'+p.unit):'')"></div>
+                <div x-show="p.change_pct!=null && Math.abs(p.change_pct)>=1" class="num" style="font-size:11.5px; font-weight:600;"
+                     :style="`color:${p.change_pct>0?'var(--danger-ink)':'var(--ok-ink)'}`"
+                     x-text="(p.change_pct>0?'+':'')+p.change_pct+'%'"></div>
+              </div>
+            </div>
+          </div>
+        </template>
+      </div>
+    </div>
+
+    <!-- product detail modal -->
+    <div class="overlay" x-show="productDetail" x-cloak @click.self="productDetail=null" style="z-index:60;">
+      <div class="modal goal-modal" @click.stop x-show="productDetail">
+        <template x-if="productDetail">
+          <div>
+            <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:12px;">
+              <div style="min-width:0;">
+                <div class="serif" style="font-size:18px; font-weight:560;" x-text="productDetail.name"></div>
+                <div style="font-size:12px; color:var(--text-3); margin-top:2px;" x-text="'kupowane '+productDetail.buy_count+'×'+(productDetail.unit?(' · jednostka: '+productDetail.unit):'')"></div>
+              </div>
+              <button class="btn ghost" @click="productDetail=null">✕</button>
+            </div>
+
+            <div style="display:flex; align-items:baseline; gap:10px; margin:16px 0 4px; flex-wrap:wrap;">
+              <span class="num" style="font-size:26px; font-weight:600;" x-text="fmtZl2(productDetail.latest_price)"></span>
+              <span style="color:var(--text-3); font-size:13px;" x-text="(productDetail.unit?('/'+productDetail.unit):'')+(productDetail.latest_supplier?(' · '+productDetail.latest_supplier):'')"></span>
+            </div>
+            <div x-show="productDetail.change_pct!=null && Math.abs(productDetail.change_pct)>=1" class="num" style="font-size:12.5px; font-weight:600;"
+                 :style="`color:${productDetail.change_pct>0?'var(--danger-ink)':'var(--ok-ink)'}`"
+                 x-text="(productDetail.change_pct>0?'+':'')+productDetail.change_pct+'% od pierwszego zakupu'"></div>
+
+            <div x-show="productDetail.overpaying" class="goal-result pace-behind" style="margin-top:14px;">
+              <span x-text="'Taniej u '+productDetail.cheapest_supplier+': '+fmtZl2(productDetail.cheapest_price)+(productDetail.unit?('/'+productDetail.unit):'')"></span>
+            </div>
+
+            <div x-show="productDetail.suppliers?.length>1">
+              <div class="card-title" style="margin:18px 0 8px;">Dostawcy (od najtańszego)</div>
+              <template x-for="(s,si) in productDetail.suppliers" :key="si">
+                <div style="display:flex; justify-content:space-between; padding:7px 0; border-bottom:1px solid var(--border); font-size:13px;">
+                  <span x-text="s.supplier"></span>
+                  <span class="num" :style="si===0?'color:var(--ok-ink); font-weight:600;':''" x-text="fmtZl2(s.price)"></span>
+                </div>
+              </template>
+            </div>
+
+            <div x-show="productDetail.history?.length>1">
+              <div class="card-title" style="margin:18px 0 8px;">Historia cen</div>
+              <div style="max-height:200px; overflow-y:auto;">
+                <template x-for="(h,hi) in productDetail.history" :key="hi">
+                  <div style="display:flex; justify-content:space-between; padding:6px 0; font-size:12.5px; color:var(--text-2);">
+                    <span x-text="fmtDateShort(h.date) + (h.supplier?(' · '+h.supplier):'')"></span>
+                    <span class="num" x-text="fmtZl2(h.price)"></span>
+                  </div>
+                </template>
+              </div>
+            </div>
+
+            <button class="btn ghost" style="width:100%; margin-top:16px;"
+                    @click="askAdvisor('Opowiedz o produkcie „'+productDetail.name+'” z moich faktur: jak zmienia się jego cena, czy gdzieś kupuję taniej i co konkretnie zrobić?')">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" style="width:14px;height:14px; vertical-align:-2px; margin-right:6px;"><path d="M21 11.5a8.38 8.38 0 0 1-8.5 8.5 8.5 8.5 0 0 1-3.5-.76L3 21l1.76-6A8.5 8.5 0 1 1 21 11.5z"/></svg>Zapytaj doradcę o ten produkt
+            </button>
+          </div>
+        </template>
       </div>
     </div>
 
     <!-- ──────────────── SETTINGS ──────────────── -->
     <div x-show="tab==='settings'" x-cloak class="page fade">
       <div class="page-head">
-        <div><h1>Konfiguracja</h1><div class="page-sub">Stan systemu i synchronizacja danych</div></div>
+        <div><h1>Konfiguracja</h1></div>
+      </div>
+
+      <!-- Restaurant profile (name / city) -->
+      <div class="card" style="margin-bottom:16px;">
+        <div class="card-head"><span class="card-title">Profil lokalu</span></div>
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px;">
+          <div class="field" style="margin:0;">
+            <label>Nazwa lokalu</label>
+            <input class="input" x-model="restaurantForm.name" placeholder="np. Gambas Seafood&Meat">
+          </div>
+          <div class="field" style="margin:0;">
+            <label>Miasto</label>
+            <input class="input" x-model="restaurantForm.city" placeholder="np. Gdańsk">
+          </div>
+        </div>
+        <div style="margin-top:12px; display:flex; align-items:center; gap:10px;">
+          <button class="btn primary" @click="saveRestaurant()" :disabled="restaurantSaving || !restaurantForm.name?.trim()">
+            <span x-show="restaurantSaving" class="spinner"></span>
+            <span x-text="restaurantSaving ? '' : 'Zapisz'"></span>
+          </button>
+          <span x-show="restaurantSaved" style="font-size:12.5px; color:var(--pos);">✓ Zapisano</span>
+        </div>
       </div>
 
       <div class="grid g-2">
@@ -2255,6 +2441,59 @@
 
       <div class="grid g-2" style="margin-top:16px;">
         <div class="card">
+          <div class="card-head"><span class="card-title">Koszty pracy (grafiki GoPOS)</span></div>
+          <p style="font-size:13px; color:var(--text-2); line-height:1.6;">
+            System pobiera zmiany pracowników z GoPOS (check-in/out) i liczy realne koszty pracy:
+            kwota „do wypłaty" z GoPOS lub godziny × stawka. Zysk netto uwzględnia je automatycznie.
+            Jeśli płace masz też w kosztach stałych — usuń je tam; dashboard ostrzega przed
+            podwójnym liczeniem.
+          </p>
+          <div style="margin-top:12px; font-size:13px;" x-show="labor?.has_data">
+            <span style="color:var(--pos);">✓ Dane aktywne:</span>
+            <span class="num" x-text="' ' + labor?.shifts + ' zmian, ' + labor?.total_hours + ' h (30 dni)'"></span>
+          </div>
+          <div style="margin-top:12px; font-size:13px; color:var(--text-3);" x-show="!labor?.has_data">
+            Brak zmian w bazie — uruchom sync lub pełną historię.
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-head">
+            <span class="card-title">Koszty stałe / mies.</span>
+            <span class="num" style="font-size:13px; color:var(--text);"
+                  x-text="fmtPLNc(overheads.length ? overheads.reduce((s,o)=>s+o.monthly_amount,0) : (netProfit?.overhead_monthly_total || 0))"></span>
+          </div>
+          <div style="display:flex; flex-direction:column; gap:8px; margin-bottom:14px;">
+            <!-- Tracked (editable) overheads -->
+            <template x-for="o in overheads" :key="o.category">
+              <div style="display:flex; align-items:center; gap:10px; padding:9px 12px; background:var(--card-2); border-radius:9px;">
+                <span style="flex:1; font-size:13px; text-transform:capitalize;" x-text="o.category"></span>
+                <span class="num" style="font-size:13px; color:var(--text);" x-text="fmtPLNc(o.monthly_amount)"></span>
+                <button class="btn ghost danger" style="padding:1px 6px;" @click="delOverhead(o.category)">✕</button>
+              </div>
+            </template>
+            <!-- Fallback: audit-derived overhead (read-only) so this matches net profit / Cele -->
+            <template x-if="!overheads.length && (netProfit?.overhead_breakdown||[]).length">
+              <div style="display:flex; flex-direction:column; gap:8px;">
+                <template x-for="o in netProfit.overhead_breakdown" :key="o.category">
+                  <div style="display:flex; align-items:center; gap:10px; padding:9px 12px; background:var(--card-2); border-radius:9px;">
+                    <span style="flex:1; font-size:13px;" x-text="o.category"></span>
+                    <span class="tag" style="font-size:10px; background:var(--accent-soft); color:var(--accent-ink);">z audytu</span>
+                    <span class="num" style="font-size:13px; color:var(--text);" x-text="fmtPLNc(o.monthly_amount)"></span>
+                  </div>
+                </template>
+                <div style="font-size:11.5px; color:var(--text-3); padding:0 2px;">Z audytu. Dodaj poniżej, by uściślić lub rozbić na pozycje.</div>
+              </div>
+            </template>
+            <div class="empty" x-show="!overheads.length && !(netProfit?.overhead_breakdown||[]).length" style="padding:18px;">Brak kosztów stałych.</div>
+          </div>
+          <div style="display:grid; grid-template-columns: 1.4fr 1fr auto; gap:8px;">
+            <input class="input" placeholder="np. czynsz" x-model="newOh.category">
+            <input class="input" type="number" placeholder="PLN / mies." x-model="newOh.amount">
+            <button class="btn" @click="addOverhead()">Dodaj</button>
+          </div>
+        </div>
+      </div>
+        <div class="card">
           <div class="card-head"><span class="card-title">Poranny briefing (Telegram / Slack)</span></div>
           <table style="margin-bottom:14px;">
             <tbody>
@@ -2282,23 +2521,6 @@
             <code style="color:var(--accent-2);">/reset</code>. Bot działa, gdy serwer jest włączony.
           </p>
         </div>
-        <div class="card">
-          <div class="card-head"><span class="card-title">Koszty pracy (grafiki GoPOS)</span></div>
-          <p style="font-size:13px; color:var(--text-2); line-height:1.6;">
-            System pobiera zmiany pracowników z GoPOS (check-in/out) i liczy realne koszty pracy:
-            kwota „do wypłaty" z GoPOS lub godziny × stawka. Zysk netto uwzględnia je automatycznie.
-            Jeśli płace masz też w kosztach stałych — usuń je tam; dashboard ostrzega przed
-            podwójnym liczeniem.
-          </p>
-          <div style="margin-top:12px; font-size:13px;" x-show="labor?.has_data">
-            <span style="color:var(--pos);">✓ Dane aktywne:</span>
-            <span class="num" x-text="' ' + labor?.shifts + ' zmian, ' + labor?.total_hours + ' h (30 dni)'"></span>
-          </div>
-          <div style="margin-top:12px; font-size:13px; color:var(--text-3);" x-show="!labor?.has_data">
-            Brak zmian w bazie — uruchom sync lub pełną historię.
-          </div>
-        </div>
-      </div>
     </div>
 
     <!-- Goal modal -->
@@ -2472,6 +2694,10 @@ const C = {
   get tooltipBorder(){ return cssVar('--line-2', 'rgba(0,0,0,.16)'); },
   get ink(){ return cssVar('--ink', '#0E1116'); },
   get ink2(){ return cssVar('--ink-2', '#5B6370'); },
+  get surface(){ return cssVar('--surface', '#141417'); },
+  get accentSoft(){ return cssVar('--accent-soft', 'rgba(168,85,247,.18)'); },
+  // calm categorical palette: accent + restrained neutrals (no legacy orange)
+  get shades(){ return [this.accent, this.accent2, this.ink2, '#8A93A1', '#5C6573', '#3A414C']; },
 };
 
 Chart.defaults.font.family = "Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif";
@@ -2509,7 +2735,7 @@ function baseOpts(yMoney = true) {
     scales: {
       x: { grid: { display: false }, ticks: { maxTicksLimit: 8, maxRotation: 0, padding: 8 }, border: { display: false } },
       y: {
-        grid: { color: 'rgba(255,255,255,.045)', lineWidth: 1, drawTicks: false },
+        grid: { color: C.grid, lineWidth: 1, drawTicks: false },
         border: { display: false }, beginAtZero: true,
         ticks: yMoney ? { callback: v => plnFmt(v), maxTicksLimit: 5, padding: 10 } : { maxTicksLimit: 5, precision: 0, padding: 10 },
       },
@@ -2542,13 +2768,15 @@ const PL_DAYS_S = ['Nd','Pn','Wt','Śr','Cz','Pt','So'];
 /* ═══════════════ Alpine app ═══════════════ */
 function app() {
   return {
-    tab: 'overview',
+    tab: 'today',
+    menuTab: 'analysis', buyTab: 'invoices', anDays: 30, showNarada: false,
+    auditReportOpen: false, researchOpen: false,
     dataReady: false,
     navOpen: false,
     setupOpen: false,
     briefMsgOpen: false,
     // data
-    kpis: null, status: null,
+    kpis: null, status: null, connError: null,
     daily: [], daily90: [], hourly: [], channels: [], topItems: [], allItems: [],
     employees: [], dow: [], netProfit: null, foodCost: null,
     recipes: [], overheads: [], costs: {}, suggestions: [],
@@ -2594,13 +2822,16 @@ function app() {
     goals: [], goalModal: false,
     goalForm: { title: '', metric: 'net_margin_pct', target_value: 0, direction: 'increase', deadline: '', notes: '' },
     goalDetail: null, goalSteps: [], newStep: '', planLoading: false,
-    invoices: [], invoiceTotals: null, invoiceDetail: null, invoiceUploading: false, invoiceCosts: null,
+    invoices: [], invoiceTotals: null, invoiceDetail: null, invoiceUploading: false, invoiceCosts: null, priceSignals: null,
+    invProducts: [], invProductsLoaded: false, productDetail: null, productCat: 'all',
     engineering: null, menuOverview: null, categories: [],
     expanded: null, detail: {},
     memories: [], showMemories: false,
+    chatThreads: [], showThreads: false,
 
     toasts: [], _tid: 0,
     me: null, theme: 'dark', onboardingDone: true,
+    restaurantForm: { name: '', city: '' }, restaurantSaving: false, restaurantSaved: false,
     setup: null, setupSteps: [], setupDoneCount: 0,
 
     /* ─────────── lifecycle ─────────── */
@@ -2613,8 +2844,16 @@ function app() {
 
       // Initial tab from URL (?tab=audit, ?tab=recipes, ...) — used by onboarding deep links
       const urlTab = new URLSearchParams(window.location.search).get('tab');
-      const validTabs = ['today','overview','revenue','menu','operations','audit','research','goals','chat','briefing','recipes','invoices','settings'];
-      if (urlTab && validTabs.includes(urlTab)) this.tab = urlTab;
+      const validTabs = ['today','overview','revenue','menu','operations','audit','research','goals','chat','briefing','recipes','invoices','products','settings'];
+      if (urlTab && validTabs.includes(urlTab)) {
+        this.tab = urlTab;
+        // Trigger the landing tab's lazy data load (go() does this on click; do it here too).
+        if (urlTab === 'invoices') this.$nextTick(() => this.loadInvoices());
+        if (urlTab === 'products') this.$nextTick(() => this.loadProducts());
+        if (urlTab === 'research') this.$nextTick(() => this.loadResearch());
+      }
+      // Mobile is the minimalist surface (Dziś/Cele/Doradca) — never land on a desktop-only tab.
+      else if (window.innerWidth <= 768) this.tab = 'today';
 
       // Auth guard — verify session; bounce only if GoPOS not yet connected.
       const ONBOARDING_RANK = {registered:0, gopos_connected:1, audit_done:2, research_done:3, recipes_added:4, briefing_active:5};
@@ -2622,6 +2861,7 @@ function app() {
         const r = await fetch('/api/auth/me');
         if (r.status === 401) { window.location.href = '/login'; return; }
         this.me = await r.json();
+        this.restaurantForm = { name: this.me?.tenant?.name || '', city: this.me?.tenant?.city || '' };
         const step = this.me?.tenant?.onboarding_step;
         if (step && (ONBOARDING_RANK[step] ?? 0) < 1) {   // not even GoPOS connected
           window.location.href = '/onboarding'; return;
@@ -2685,6 +2925,23 @@ function app() {
       if (s.tab) this.go(s.tab);
     },
 
+    async saveRestaurant() {
+      if (!this.restaurantForm.name?.trim()) return;
+      this.restaurantSaving = true; this.restaurantSaved = false;
+      try {
+        const r = await fetch('/api/dashboard/restaurant', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name: this.restaurantForm.name, city: this.restaurantForm.city }),
+        });
+        if (!r.ok) throw new Error();
+        const d = await r.json();
+        if (this.me?.tenant) { this.me.tenant.name = d.name; this.me.tenant.city = d.city; }
+        this.restaurantSaved = true;
+        this.toast('Zapisano profil lokalu', 'ok');
+        setTimeout(() => { this.restaurantSaved = false; }, 2500);
+      } catch { this.toast('Nie udało się zapisać', 'err'); }
+      finally { this.restaurantSaving = false; }
+    },
     toggleTheme() {
       this.theme = this.theme === 'dark' ? 'light' : 'dark';
       document.documentElement.classList.remove('light','dark');
@@ -2694,18 +2951,51 @@ function app() {
       this.$nextTick(() => this.renderTab(this.tab));
     },
 
-    go(t) { this.tab = t; this.navOpen = false; if (t === 'research' && !this.researchState) this.loadResearch(); if (t === 'invoices') this.loadInvoices(); },
+    go(t) {
+      // Old page ids still arrive from AI actions, saved links and setup steps —
+      // route them into the merged pages (page or page:subtab).
+      const alias = { overview: 'analytics', revenue: 'analytics', operations: 'analytics',
+                      recipes: 'menu:recipes', menu: 'menu:analysis',
+                      invoices: 'purchasing:invoices', products: 'purchasing:products',
+                      audit: 'strategy', research: 'strategy', briefing: 'chat' };
+      let target = alias[t] || t;
+      if (target.includes(':')) {
+        const [page, sub] = target.split(':');
+        if (page === 'menu') this.menuTab = sub;
+        if (page === 'purchasing') this.buyTab = sub;
+        target = page;
+      }
+      this.tab = target;
+      this.navOpen = false;
+      if (t === 'research' && !this.researchState) this.loadResearch();
+      if (target === 'purchasing') { this.loadInvoices(); this.loadProducts(); }
+    },
+    async loadProducts() {
+      try { const d = await this.j('/api/invoices/products/list'); this.invProducts = d.products || []; this.invProductsLoaded = true; }
+      catch (e) { this.invProductsLoaded = true; }
+    },
+    productCats() {
+      // distinct categories present, in a fixed sensible order, with counts
+      const order = [['food','Jedzenie'],['drinks','Napoje'],['wine','Wina'],['alcohol','Alkohol'],['chemistry','Chemia'],['media','Media'],['other','Inne']];
+      const counts = {};
+      (this.invProducts || []).forEach(p => { counts[p.category || 'other'] = (counts[p.category || 'other'] || 0) + 1; });
+      return order.filter(([k]) => counts[k]).map(([k, label]) => ({ key: k, label, n: counts[k] }));
+    },
+    filteredProducts() {
+      if (this.productCat === 'all') return this.invProducts || [];
+      return (this.invProducts || []).filter(p => (p.category || 'other') === this.productCat);
+    },
 
     async reloadAll() {
       await Promise.all([
         this.j('/api/dashboard/kpis').then(d => this.kpis = d),
         this.j('/api/dashboard/status').then(d => this.status = d),
         this.j(`/api/dashboard/revenue-chart?days=90`).then(d => { this.daily90 = d || []; }),
-        this.j('/api/dashboard/hourly-chart?days=14').then(d => this.hourly = d || []),
-        this.j('/api/dashboard/channels?days=30').then(d => this.channels = d || []),
+        this.j(`/api/dashboard/hourly-chart?days=${this.anDays}`).then(d => this.hourly = d || []),
+        this.j(`/api/dashboard/channels?days=${this.anDays}`).then(d => this.channels = d || []),
         this.j('/api/dashboard/top-items?metric=revenue&days=30&limit=20').then(d => { this.topItems = d || []; this.allItems = d || []; }),
-        this.j('/api/dashboard/employees?days=30').then(d => this.employees = d || []),
-        this.j('/api/dashboard/day-of-week?days=90').then(d => this.dow = d || []),
+        this.j(`/api/dashboard/employees?days=${this.anDays}`).then(d => this.employees = d || []),
+        this.j(`/api/dashboard/day-of-week?days=${this.anDays}`).then(d => this.dow = d || []),
         this.j('/api/chat/agents').then(d => this.agents = d || []),
         this.j('/api/recipes/').then(d => this.recipes = d || []),
         this.j('/api/recipes/overheads/list').then(d => this.overheads = d || []),
@@ -2721,7 +3011,7 @@ function app() {
           this.auditReportDate = d.report_date;
           this.profile = d.profile || {};
         }).catch(() => {}),
-        this.j('/api/research/status').then(d => { this.researchState = d; if (d?.status === 'running') this.pollResearch(); }).catch(() => {}),
+        this.j('/api/research/status').then(d => { this.researchState = this.normalizeResearch(d); if (d?.status === 'running') this.pollResearch(); }).catch(() => {}),
         this.j('/api/dashboard/briefing-today').then(d => this.briefing = d).catch(() => {}),
         this.j('/api/invoices').then(d => { this.invoices = d.invoices || []; this.invoiceTotals = d.totals || null; }).catch(() => {}),
         this.j('/api/dashboard/labor?days=30').then(d => this.labor = d).catch(() => {}),
@@ -2736,6 +3026,7 @@ function app() {
         this.j('/api/sync/status').then(d => {
           this.fullHistory = !!d.full_history;
           this.bfProgress = d.full_backfill_progress || null;
+          this.connError = d.connection_error || null;
           if (this.bfProgress && !this.bfProgress.finished) this.pollBackfill();
         }).catch(() => {}),
       ]);
@@ -2758,8 +3049,8 @@ function app() {
         this.week = { cur: d.reduce((s, x) => s + (x.revenue || 0), 0), prev: 0, delta: null };
       }
 
-      // best / worst weekday (by avg per occurrence, min 2 occurrences)
-      const dowOk = this.dow.filter(x => (x.days_count || 0) >= 1 && x.avg_day_revenue != null);
+      // best / worst weekday (by avg revenue; skip closed days with 0 revenue)
+      const dowOk = this.dow.filter(x => x.avg_day_revenue != null && x.avg_day_revenue > 0);
       if (dowOk.length) {
         this.bestDow  = [...dowOk].sort((a, b) => b.avg_day_revenue - a.avg_day_revenue)[0];
         this.worstDow = [...dowOk].sort((a, b) => a.avg_day_revenue - b.avg_day_revenue)[0];
@@ -2813,13 +3104,24 @@ function app() {
       const chat = (label, q) => ({ label, type: 'chat', param: q });
       const goto = (label, t) => ({ label, type: 'tab', param: t });
       try {
-        if (tab === 'overview') {
+        if (tab === 'analytics') {
           if (this.week?.delta != null) {
             const d = this.week.delta, up = d >= 0;
             F(up ? `Przychód rośnie o ${d}% tydzień do tygodnia — warto utrwalić, co zadziałało.`
                  : `Przychód spadł o ${Math.abs(d)}% tydzień do tygodnia.`,
               chat('Co z tym zrobić?', up ? 'Co najbardziej napędziło wzrost przychodu w tym tygodniu i jak to utrwalić?' : 'Dlaczego przychód spadł w tym tygodniu i jak go odbudować?'),
               up ? 'good' : 'warn');
+          }
+          if (this.bestDow && this.worstDow && this.bestDow.dow !== this.worstDow.dow) {
+            const gap = this.bestDow.avg_day_revenue && this.worstDow.avg_day_revenue
+              ? Math.round((this.bestDow.avg_day_revenue / Math.max(this.worstDow.avg_day_revenue,1) - 1) * 100) : null;
+            F(`${PL_DAYS[this.bestDow.dow]} jest najmocniejszy${gap ? `, ${PL_DAYS[this.worstDow.dow]} słabszy o ~${gap}%` : `, ${PL_DAYS[this.worstDow.dow]} najsłabszy`}. Słabe dni to największa rezerwa wzrostu.`,
+              chat('Jak wypełnić słabe dni?', `Jak podnieść sprzedaż w ${PL_DAYS[this.worstDow.dow]}, mój najsłabszy dzień? Daj konkretny plan.`), 'neutral');
+          }
+          const lp = this.labor?.labor_pct;
+          if (lp != null && lp > 35) {
+            F(`Koszty pracy to ${lp}% przychodu (zdrowy zakres 25-35%) — powyżej normy.`,
+              chat('Optymalizuj grafik', 'Jak zoptymalizować grafik obsady względem ruchu w ciągu dnia i tygodnia?'), 'warn');
           }
           if (this.netProfit && this.netProfit.complete === false) {
             F('Zysk netto jest liczony niepełnie — brakuje części kosztów (np. pracy). Uzupełnij, by liczby były prawdziwe.',
@@ -2828,29 +3130,6 @@ function app() {
           const fc = this.foodCost?.food_cost_pct ?? this.kpis?.food_cost_pct;
           if (fc != null && fc > 33) F(`Food cost ${fc}% jest powyżej zdrowego progu (~30-33%) — tu uciekają pieniądze.`,
             goto('Zobacz menu', 'menu'), 'warn');
-        }
-        if (tab === 'revenue') {
-          if (this.bestDow && this.worstDow && this.bestDow.dow !== this.worstDow.dow) {
-            const gap = this.bestDow.avg_day_revenue && this.worstDow.avg_day_revenue
-              ? Math.round((this.bestDow.avg_day_revenue / Math.max(this.worstDow.avg_day_revenue,1) - 1) * 100) : null;
-            F(`${PL_DAYS[this.bestDow.dow]} jest najmocniejszy${gap ? `, ${PL_DAYS[this.worstDow.dow]} słabszy o ~${gap}%` : `, ${PL_DAYS[this.worstDow.dow]} najsłabszy`}. Słabe dni to największa rezerwa wzrostu.`,
-              chat('Jak wypełnić słabe dni?', `Jak podnieść sprzedaż w ${PL_DAYS[this.worstDow.dow]}, mój najsłabszy dzień? Daj konkretny plan.`), 'neutral');
-          }
-          if (this.kpis?.avg_ticket != null) {
-            const at = Math.round(this.kpis.avg_ticket);
-            F(`Średni rachunek to ${at} zł. Podniesienie go choćby o 5-10% przekłada się wprost na zysk.`,
-              chat('Jak podnieść rachunek?', 'Jak podnieść średni rachunek bez odstraszania gości? Konkretne pomysły dla mojej restauracji.'), 'neutral');
-          }
-        }
-        if (tab === 'operations') {
-          const lp = this.labor?.labor_pct;
-          if (lp != null) {
-            const high = lp > 35;
-            F(`Koszty pracy to ${lp}% przychodu (zdrowy zakres 25-35%). ${high ? 'Powyżej normy.' : 'W normie.'}`,
-              chat('Optymalizuj grafik', 'Jak zoptymalizować grafik obsady względem ruchu w ciągu dnia i tygodnia?'), high ? 'warn' : 'good');
-          }
-          if (this.peakHour) F(`Szczyt ruchu o ${this.peakHour.hour}:00${this.peakShare ? ` (~${this.peakShare}% obrotu)` : ''} — kuchnia i obsługa muszą być wtedy gotowe.`,
-            chat('Ustaw obsadę pod szczyt', 'Jak ustawić obsadę pod godziny szczytu, żeby nie tracić obrotu ani nie przepłacać?'), 'neutral');
         }
         if (tab === 'menu') {
           if (this.recipes?.length === 0 || (this.menuOverview && (this.menuOverview.coverage_pct ?? 0) < 40)) {
@@ -2864,8 +3143,8 @@ function app() {
               chat(high ? 'Co poprawić?' : 'Co pilnować?', 'Które dania najbardziej psują mój food cost i jak to poprawić?'), high ? 'warn' : 'good');
           }
           if (this.topItems?.length) {
-            F(`Najlepiej sprzedaje się „${this.topItems[0].name}". Bestsellery to dźwignia — warto je eksponować i dbać o ich marżę.`,
-              chat('Jak to wykorzystać?', `Jak wykorzystać moje bestsellery (np. ${this.topItems[0].name}) do podniesienia zysku?`), 'neutral');
+            F(`Najlepiej sprzedaje się „${this.topItems[0].item_name}". Bestsellery to dźwignia — warto je eksponować i dbać o ich marżę.`,
+              chat('Jak to wykorzystać?', `Jak wykorzystać moje bestsellery (np. ${this.topItems[0].item_name}) do podniesienia zysku?`), 'neutral');
           }
         }
       } catch (e) {}
@@ -2928,15 +3207,31 @@ function app() {
 
     /* ─────────── chart rendering per tab ─────────── */
     renderTab(t) {
-      if (t === 'today')      this.renderToday();
-      if (t === 'overview')   this.renderOverview();
-      if (t === 'revenue')    this.renderRevenue();
-      if (t === 'menu')       this.renderMenu();
-      if (t === 'operations') this.renderOps();
+      if (t === 'today')     this.renderToday();
+      if (t === 'analytics') this.renderAnalytics();
+      if (t === 'menu')      this.renderMenu();
     },
 
-    async renderOverview() {
-      // main revenue chart (respects revDays)
+    // One period (anDays) drives every chart and table on the Analityka page.
+    async setAnDays(n) {
+      if (this.anDays === n) return;
+      this.anDays = n; this.revDays = n;
+      const q = (u) => this.j(u).catch(() => []);
+      const [hourly, channels, dow, employees, labor] = await Promise.all([
+        q(`/api/dashboard/hourly-chart?days=${n}`),
+        q(`/api/dashboard/channels?days=${n}`),
+        q(`/api/dashboard/day-of-week?days=${n}`),
+        q(`/api/dashboard/employees?days=${n}`),
+        this.j(`/api/dashboard/labor?days=${n}`).catch(() => null),
+      ]);
+      this.hourly = hourly; this.channels = channels; this.dow = dow;
+      this.employees = employees; if (labor) this.labor = labor;
+      this.derive();
+      this.$nextTick(() => this.renderAnalytics());
+    },
+
+    async renderAnalytics() {
+      // main revenue chart (respects revDays = anDays)
       this.daily = this.revDays === 90 ? this.daily90 : await this.j(`/api/dashboard/revenue-chart?days=${this.revDays}`).catch(() => []);
       const labels = this.daily.map(x => x.date.slice(5));
       const rev = this.daily.map(x => x.revenue || 0);
@@ -2957,55 +3252,55 @@ function app() {
         options: { ...baseOpts(true), plugins: { ...baseOpts(true).plugins, legend: { display: true, position: 'top', align: 'end', labels: { boxWidth: 14, boxHeight: 2, color: C.tick } } } },
       });
 
-      // hourly — fill all 24h
+      // hourly — revenue bars + orders line (the one hourly chart in the app)
       const byHour = Object.fromEntries(this.hourly.map(x => [x.hour, x]));
       const hours = [...Array(24).keys()];
       renderChart('chHourly', {
         type: 'bar',
         data: {
           labels: hours.map(h => h + ''),
-          datasets: [{ data: hours.map(h => byHour[h]?.revenue || 0),
-            backgroundColor: hours.map(h => (byHour[h]?.revenue || 0) === Math.max(...this.hourly.map(x => x.revenue || 0)) && byHour[h] ? C.accent : 'rgba(237,125,58,.35)'),
-            borderRadius: 4, borderSkipped: false }],
+          datasets: [
+            { type: 'bar', data: hours.map(h => byHour[h]?.revenue || 0),
+              backgroundColor: hours.map(h => (byHour[h]?.revenue || 0) === Math.max(...this.hourly.map(x => x.revenue || 0)) && byHour[h] ? C.accent : C.accentSoft),
+              borderRadius: 4, borderSkipped: false, yAxisID: 'y', label: 'Przychód' },
+            { type: 'line', data: hours.map(h => byHour[h]?.orders || 0), borderColor: 'rgba(255,255,255,.35)', borderWidth: 1.5,
+              borderDash: [4, 3], pointRadius: 0, tension: .35, yAxisID: 'y1', label: 'Zamówienia' },
+          ],
         },
-        options: baseOpts(true),
+        options: {
+          ...baseOpts(true),
+          plugins: { ...baseOpts(true).plugins,
+            tooltip: { backgroundColor: C.tooltipBg, borderColor: C.tooltipBorder, borderWidth: 1,
+              callbacks: { label: ctx => ctx.datasetIndex === 0 ? ' ' + plnFmt(ctx.parsed.y, false) : ' ' + ctx.parsed.y + ' zam.' } } },
+          scales: {
+            x: { grid: { display: false }, ticks: { maxTicksLimit: 12 } },
+            y: { grid: { color: C.grid }, border: { display: false }, beginAtZero: true, ticks: { callback: v => plnFmt(v), maxTicksLimit: 5 } },
+            y1: { position: 'right', grid: { display: false }, border: { display: false }, beginAtZero: true, ticks: { maxTicksLimit: 4, precision: 0 } },
+          },
+        },
       });
 
       // channels doughnut
       if (this.channels.length) {
-        const shades = ['#ED7D3A', '#F4A468', '#8A93A1', '#5C6573', '#3A414C', '#2C313B'];
+        const shades = C.shades;
         renderChart('chChannels', {
           type: 'doughnut',
           data: {
             labels: this.channels.map(c => c.channel),
             datasets: [{ data: this.channels.map(c => c.revenue),
               backgroundColor: this.channels.map((_, i) => shades[i % shades.length]),
-              borderColor: '#13161B', borderWidth: 3, hoverOffset: 6 }],
+              borderColor: C.surface, borderWidth: 3, hoverOffset: 6 }],
           },
           options: {
             responsive: true, maintainAspectRatio: false, cutout: '68%',
             plugins: {
-              legend: { position: 'bottom', labels: { boxWidth: 8, boxHeight: 8, usePointStyle: true, pointStyle: 'circle', padding: 14, color: '#97A0AD' } },
+              legend: { position: 'bottom', labels: { boxWidth: 8, boxHeight: 8, usePointStyle: true, pointStyle: 'circle', padding: 14, color: C.ink2 } },
               tooltip: { backgroundColor: C.tooltipBg, borderColor: C.tooltipBorder, borderWidth: 1,
                 callbacks: { label: ctx => ' ' + ctx.label + ': ' + plnFmt(ctx.parsed, false) } },
             },
           },
         });
       }
-    },
-
-    renderRevenue() {
-      const labels = this.daily90.map(x => x.date.slice(5));
-      const rev = this.daily90.map(x => x.revenue || 0);
-      renderChart('chRev90', {
-        type: 'line',
-        data: { labels, datasets: [
-          { data: rev, borderColor: C.accent, borderWidth: 1.8,
-            backgroundColor: areaGradient('chRev90', C.accent), fill: true, tension: .3, pointRadius: 0, pointHoverRadius: 4 },
-          { data: movingAvg(rev, 7), borderColor: 'rgba(255,255,255,.3)', borderWidth: 1.5, borderDash: [5,4], pointRadius: 0, tension: .3 },
-        ]},
-        options: baseOpts(true),
-      });
 
       // dow avg — ordered Mon..Sun
       const order = [1,2,3,4,5,6,0];
@@ -3015,7 +3310,7 @@ function app() {
         data: {
           labels: order.map(d => PL_DAYS_S[d]),
           datasets: [{ data: order.map(d => byDow[d]?.avg_day_revenue || 0),
-            backgroundColor: order.map(d => byDow[d] === this.bestDow ? C.accent : 'rgba(237,125,58,.35)'),
+            backgroundColor: order.map(d => byDow[d] === this.bestDow ? C.accent : C.accentSoft),
             borderRadius: 6, borderSkipped: false }],
         },
         options: baseOpts(true),
@@ -3028,8 +3323,8 @@ function app() {
           data: {
             labels: this.monthly.map(m => m.month),
             datasets: [{ data: this.monthly.map(m => m.revenue),
-              backgroundColor: 'rgba(237,125,58,.45)', borderRadius: 5, borderSkipped: false,
-              hoverBackgroundColor: C.accent }],
+              backgroundColor: C.accent, borderRadius: 5, borderSkipped: false,
+              hoverBackgroundColor: C.accent2 }],
           },
           options: baseOpts(true),
         });
@@ -3044,48 +3339,11 @@ function app() {
         type: 'bar',
         data: {
           labels: bd.map(x => x.dish_name.length > 18 ? x.dish_name.slice(0, 17) + '…' : x.dish_name),
-          datasets: [{ data: bd.map(x => x.total_cost), backgroundColor: 'rgba(237,125,58,.5)', borderRadius: 5, borderSkipped: false }],
+          datasets: [{ data: bd.map(x => x.total_cost), backgroundColor: C.accent, borderRadius: 5, borderSkipped: false }],
         },
         options: { ...baseOpts(true), indexAxis: 'y',
           scales: { x: { grid: { color: C.grid }, border: { display: false }, ticks: { callback: v => plnFmt(v), maxTicksLimit: 5 } },
                     y: { grid: { display: false }, border: { display: false } } } },
-      });
-    },
-
-    renderOps() {
-      const byHour = Object.fromEntries(this.hourly.map(x => [x.hour, x]));
-      const hours = [...Array(24).keys()];
-      renderChart('chOpsHourly', {
-        type: 'bar',
-        data: {
-          labels: hours.map(h => h + ''),
-          datasets: [
-            { type: 'bar', data: hours.map(h => byHour[h]?.revenue || 0), backgroundColor: 'rgba(237,125,58,.4)',
-              borderRadius: 4, borderSkipped: false, yAxisID: 'y', label: 'Przychód' },
-            { type: 'line', data: hours.map(h => byHour[h]?.orders || 0), borderColor: '#F4A468', borderWidth: 2,
-              pointRadius: 0, tension: .35, yAxisID: 'y1', label: 'Zamówienia' },
-          ],
-        },
-        options: {
-          ...baseOpts(true),
-          plugins: { ...baseOpts(true).plugins, legend: { display: true, position: 'top', align: 'end', labels: { boxWidth: 14, boxHeight: 2, color: C.tick } },
-            tooltip: { backgroundColor: C.tooltipBg, borderColor: C.tooltipBorder, borderWidth: 1,
-              callbacks: { label: ctx => ctx.datasetIndex === 0 ? ' ' + plnFmt(ctx.parsed.y, false) : ' ' + ctx.parsed.y + ' zam.' } } },
-          scales: {
-            x: { grid: { display: false }, ticks: { maxTicksLimit: 12 } },
-            y: { grid: { color: C.grid }, border: { display: false }, beginAtZero: true, ticks: { callback: v => plnFmt(v), maxTicksLimit: 5 } },
-            y1: { position: 'right', grid: { display: false }, border: { display: false }, beginAtZero: true, ticks: { maxTicksLimit: 5, precision: 0 } },
-          },
-        },
-      });
-
-      const order = [1,2,3,4,5,6,0];
-      const byDow = Object.fromEntries(this.dow.map(x => [x.dow, x]));
-      renderChart('chOpsDow', {
-        type: 'bar',
-        data: { labels: order.map(d => PL_DAYS_S[d]),
-          datasets: [{ data: order.map(d => byDow[d]?.orders || 0), backgroundColor: 'rgba(244,164,104,.45)', borderRadius: 6, borderSkipped: false }] },
-        options: baseOpts(false),
       });
     },
 
@@ -3336,6 +3594,7 @@ function app() {
     async toggleMemories() {
       this.showMemories = !this.showMemories;
       if (this.showMemories) {
+        this.showThreads = false;
         this.memories = await this.j('/api/chat/memories').catch(() => []);
       }
     },
@@ -3343,9 +3602,34 @@ function app() {
       await fetch(`/api/chat/memories/${id}`, { method: 'DELETE' });
       this.memories = this.memories.filter(m => m.id !== id);
     },
+    // "New conversation" — the current one is archived server-side (recoverable
+    // from Historia), never destroyed.
     async clearWebChat() {
       await fetch('/api/chat/history?session=web', { method: 'DELETE' });
       this.chat = [];
+      this.showThreads = false;
+      this.toast('Rozmowa zapisana w historii', 'ok');
+    },
+    async toggleThreads() {
+      this.showThreads = !this.showThreads;
+      if (this.showThreads) {
+        this.showMemories = false;
+        this.chatThreads = await this.j('/api/chat/threads?session=web').catch(() => []);
+      }
+    },
+    async openThread(t) {
+      const msgs = await this.j(`/api/chat/threads/${t.thread_id}?session=web`).catch(() => []);
+      if (msgs.length) {
+        this.chat = msgs.map(m => ({ role: m.role, content: m.content }));
+        this.showThreads = false;
+        this.$nextTick(() => { const b = document.getElementById('chatBody'); if (b) b.scrollTop = b.scrollHeight; });
+      }
+    },
+    threadDate(t) {
+      if (!t.ended_at) return '';
+      const d = new Date(t.ended_at);
+      const M = ['sty','lut','mar','kwi','maj','cze','lip','sie','wrz','paź','lis','gru'];
+      return `${d.getDate()} ${M[d.getMonth()]}, ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
     },
 
     quadEmoji(q) { return { star: '⭐', plowhorse: '🐴', puzzle: '🧩', dog: '🐕' }[q] || '·'; },
@@ -3388,7 +3672,7 @@ function app() {
     renderEngineering() {
       const data = (this.engineering?.analyzed || []).filter(a => a.margin_pct != null);
       if (!data.length) return;
-      const colors = { star: '#34D399', plowhorse: '#ED7D3A', puzzle: '#60A5FA', dog: '#F87171' };
+      const colors = { star: '#34D399', plowhorse: C.accent, puzzle: '#60A5FA', dog: '#F87171' };
       renderChart('chEngineering', {
         type: 'scatter',
         data: { datasets: [{
@@ -3446,7 +3730,7 @@ function app() {
           labels: hours.map(h => h + ':00'),
           datasets: [
             { type: 'bar', label: 'Dziś', data: hours.map(h => todayMap[h] || 0),
-              backgroundColor: 'rgba(237,125,58,.65)', borderRadius: 5, borderSkipped: false },
+              backgroundColor: C.accent, borderRadius: 5, borderSkipped: false },
             { type: 'line', label: 'Typowy ' + ['pon.','wt.','śr.','czw.','pt.','sob.','niedz.'][t.weekday],
               data: hours.map(h => typMap[h] || 0),
               borderColor: 'rgba(255,255,255,.35)', borderWidth: 1.5, borderDash: [5, 4],
@@ -3558,8 +3842,17 @@ function app() {
     },
 
     /* ─────────── RESEARCH (Analiza rynku) ─────────── */
+    // Give every suggested goal a defined, reactive `_added` flag so the
+    // "Dodaj do celów" button binds correctly (otherwise :disabled on an
+    // undefined prop leaves a stale disabled attribute and the button is dead).
+    normalizeResearch(d) {
+      if (d && Array.isArray(d.suggested_goals)) {
+        d.suggested_goals = d.suggested_goals.map(g => ({ ...g, _added: !!g._added }));
+      }
+      return d;
+    },
     async loadResearch() {
-      this.researchState = await this.j('/api/research/status').catch(() => null);
+      this.researchState = this.normalizeResearch(await this.j('/api/research/status').catch(() => null));
       if (this.researchState?.status === 'running') this.pollResearch();
     },
     async runResearch() {
@@ -3572,7 +3865,7 @@ function app() {
     pollResearch() {
       clearInterval(this._researchPoll);
       const tick = async () => {
-        const d = await this.j('/api/research/status').catch(() => null);
+        const d = this.normalizeResearch(await this.j('/api/research/status').catch(() => null));
         if (d) {
           this.researchState = d;
           if (d.status === 'done' || d.status === 'error') {
@@ -3609,9 +3902,10 @@ function app() {
         this.invoiceTotals = d.totals || null;
       } catch (e) {}
       this.j('/api/invoices/costs/summary?days=30').then(d => this.invoiceCosts = d).catch(() => {});
+      this.j('/api/invoices/costs/price-signals').then(d => this.priceSignals = d).catch(() => {});
     },
     costCatLabel(c) {
-      return ({food:'Jedzenie', drinks:'Napoje', alcohol:'Alkohol', chemistry:'Chemia', other:'Inne'})[c] || c;
+      return ({food:'Jedzenie', drinks:'Napoje', wine:'Wina', alcohol:'Alkohol', chemistry:'Chemia', media:'Media', other:'Inne'})[c] || c;
     },
     async uploadInvoice(ev) {
       const file = ev.target.files?.[0];
@@ -3683,10 +3977,11 @@ function app() {
     paceLabel(p) {
       return ({reached:'Osiągnięty', ahead:'Przed planem', on_track:'Na dobrej drodze',
         behind:'Tempo za wolne', overdue:'Po terminie', no_data:'Brak danych',
-        no_deadline:'Bez terminu'})[p] || '—';
+        pending:'Zaplanowany', no_deadline:'Bez terminu'})[p] || '—';
     },
     paceExplain(g) {
       if (g.reached) return 'Cel zrealizowany — świetna robota.';
+      if (g.not_started) return 'Okres celu jeszcze się nie zaczął' + (g.starts_in_days != null ? ` — startuje za ${g.starts_in_days} dni.` : '.');
       if (g.pace === 'no_deadline') return 'Brak terminu — dodaj go, by śledzić tempo.';
       if (g.pace === 'no_data') return 'Za mało danych, by ocenić tempo.';
       if (g.days_left != null && g.days_left < 0) return 'Termin minął, a cel nie został osiągnięty.';
@@ -3696,10 +3991,31 @@ function app() {
       if (g.pace === 'behind') return left + 'Tempo jest za wolne — czas na konkretne działania poniżej.';
       return left;
     },
-    fmtGoalVal(g) {
-      const v = Math.round((g.current_value ?? 0) * 10) / 10;
-      return (g.metric || '').includes('pct') ? v + '%' : v;
+    // "lipiec–sierpień 2026" from a spec goal's measured period
+    goalPeriod(g) {
+      if (!g.period_from) return '';
+      const M = ['stycznia','lutego','marca','kwietnia','maja','czerwca','lipca','sierpnia','września','października','listopada','grudnia'];
+      const a = new Date(g.period_from + 'T00:00:00'), b = new Date(g.period_to + 'T00:00:00');
+      if (a.getFullYear() === b.getFullYear() && a.getMonth() !== b.getMonth())
+        return `${M[a.getMonth()]}–${M[b.getMonth()]} ${b.getFullYear()}`;
+      const f = (d) => `${d.getDate()} ${M[d.getMonth()]} ${d.getFullYear()}`;
+      return `${f(a)} – ${f(b)}`;
     },
+    // "+30% vs ten sam okres 2025 (327 tys. zł)" for comparison goals
+    goalCompare(g) {
+      if (g.comparison === 'yoy' && g.baseline_value != null)
+        return `vs ten sam okres rok temu (${this.fmtGoalNum(g, g.baseline_value)})`;
+      if (g.comparison === 'prev_period' && g.baseline_value != null)
+        return `vs poprzedni okres (${this.fmtGoalNum(g, g.baseline_value)})`;
+      return '';
+    },
+    fmtGoalNum(g, val) {
+      if (val == null) return '—';
+      if ((g.metric || '').includes('pct')) return (Math.round(val * 10) / 10) + '%';
+      if (['revenue', 'net_profit', 'avg_ticket'].includes(g.metric)) return this.fmtPLNc(val);
+      return Math.round(val * 10) / 10;
+    },
+    fmtGoalVal(g) { return this.fmtGoalNum(g, g.current_value); },
     async openGoal(g) {
       this.goalDetail = g;
       this.goalSteps = [];
@@ -3738,10 +4054,119 @@ function app() {
       const q = `Jak mam osiągnąć cel: „${g.title}"? Aktualnie ${g.current_value ?? '—'}, cel ${g.target_value}. Daj konkretny plan w oparciu o moje dane.`;
       this.$nextTick(() => { if (typeof this.send === 'function') this.send(q); });
     },
+    // All goal-setting goes through the advisor so every goal becomes a precise,
+    // measurable spec (period + comparison), never a flat guess.
+    newGoal(seed) {
+      this.goalModal = false; this.goalDetail = null;
+      this.tab = 'chat';
+      const q = seed || 'Chcę ustawić nowy cel dla restauracji. Zadaj mi pytania (czego dotyczy, na jaki okres, względem czego — np. vs zeszły rok), policz to dokładnie i pokaż mi liczby, a po moim potwierdzeniu ustaw mierzalny cel.';
+      this.$nextTick(() => { if (typeof this.send === 'function') this.send(q); });
+    },
     metricLabel(m) {
       return ({net_margin_pct:'Marża netto %', net_profit:'Zysk netto', revenue:'Przychód 30d',
         avg_ticket:'Średni rachunek', food_cost_pct:'Food cost %', labor_pct:'Koszty pracy %',
         manual:'Ręczna'})[m] || m;
+    },
+    askAdvisor(q) {
+      this.goalModal = false; this.goalDetail = null; this.invoiceDetail = null; this.navOpen = false;
+      this.tab = 'chat';
+      this.$nextTick(() => { if (typeof this.send === 'function') this.send(q); });
+    },
+
+    /* ─────────── North-star (realny zysk netto) + dźwignie + fokus ─────────── */
+    netStar() {
+      const np = this.netProfit || {};
+      const cov = (this.menuOverview?.coverage_pct ?? 0);
+      // Single source of truth = the net-profit endpoint (knows declared labor + audit overhead).
+      const foodMeasured = cov >= 60 && !(np.missing_components || []).some(m => m.includes('food'));
+      const laborMeasured = !!np.labor_has_data;
+      const overheadMeasured = (np.overhead || 0) > 0;
+      const measured = 1 + (foodMeasured?1:0) + (laborMeasured?1:0) + (overheadMeasured?1:0);
+      const goal = (this.goals || []).find(g => g.metric === 'net_profit') || null;
+      const missing = [!foodMeasured ? 'receptury dań' : null, !laborMeasured ? 'koszty pracy' : null,
+                       !overheadMeasured ? 'koszty stałe' : null].filter(Boolean);
+      return {
+        value: np.net_profit, margin: np.net_margin_pct,
+        complete: measured === 4, measured, total: 4, missing,
+        foodMeasured, laborMeasured,
+        goal, hasTarget: !!goal, target: goal?.target_value,
+        progressPct: goal?.progress_pct, expectedPct: goal?.expected_pct,
+        pace: goal?.pace, daysLeft: goal?.days_left,
+      };
+    },
+    // The revenue window the net-profit levers are measured over.
+    leverPeriodLabel() {
+      const d = this.netProfit?.period_days;
+      return d ? ('ostatnie ' + d + ' dni') : 'ostatnie 30 dni';
+    },
+    // "% udziału w przychodzie" for a cost lever — the anchor the user was missing.
+    _share(amount) {
+      const rev = this.netProfit?.revenue;
+      if (!rev || amount == null) return null;
+      return Math.round(amount / rev * 100);
+    },
+    profitLevers() {
+      const np = this.netProfit || {};
+      const cov = (this.menuOverview?.coverage_pct ?? 0);
+      const revPct = (this.kpis?.revenue_change_pct ?? null);
+      const revUp = (revPct ?? 0) >= 0;
+      const fShare = (a) => { const s = this._share(a); return s != null ? (s + '% przych.') : ''; };
+      return [
+        { key:'revenue', label:'Przychód', tab:'revenue', sign:'+', amount: np.revenue,
+          state:'ok', note: revPct==null ? '' : ((revUp?'+':'') + revPct + '% r/r'),
+          color: revPct==null ? 'var(--text-3)' : (revUp ? 'var(--ok-ink)' : 'var(--danger-ink)') },
+        { key:'food', label:'Food cost', tab:'menu', sign:'−',
+          amount: cov>=60 ? np.food_cost : null,
+          state: cov>=60 ? 'ok' : 'missing',
+          note: cov>=60 ? fShare(np.food_cost) : 'niepełne',
+          color: cov>=60 ? 'var(--text-3)' : 'var(--warn-ink)' },
+        { key:'labor', label:'Koszty pracy', tab:'operations', sign:'−',
+          amount: np.labor_has_data ? np.labor_cost : null,
+          state: np.labor_has_data ? 'ok' : 'missing',
+          note: np.labor_has_data ? (fShare(np.labor_cost) + (np.labor_source==='declared' ? ' · audyt' : '')) : 'brak danych',
+          color: np.labor_has_data ? 'var(--text-3)' : 'var(--warn-ink)' },
+        { key:'overhead', label:'Koszty stałe', tab:'recipes', sign:'−',
+          amount: (np.overhead||0) > 0 ? np.overhead : null,
+          state: (np.overhead||0) > 0 ? 'ok' : 'missing',
+          note: (np.overhead||0) > 0 ? (fShare(np.overhead) + (np.overhead_source==='audyt' ? ' · audyt' : '')) : 'brak danych',
+          color: (np.overhead||0) > 0 ? 'var(--text-3)' : 'var(--warn-ink)' },
+      ];
+    },
+    focusMove() {
+      const cov = (this.menuOverview?.coverage_pct ?? 0);
+      if (this.netProfit == null) return null;
+      if (cov < 60) {
+        return { kind:'data', title:'Dodaj receptury głównych dań',
+          why:'Znam koszt tylko '+(this.foodCost?.dishes_with_recipes||0)+' dań ('+Math.round(cov)+'% przychodu). Bez tego Twoja marża to zgadywanie.',
+          impact:'Odblokuje prawdziwy zysk netto', cta:'Dodaj receptury', tab:'recipes', prompt:null };
+      }
+      // Labor counts as covered when the net-profit engine has ANY source for it
+      // (GoPOS RCP or the declared figure from the audit) — the levers below say
+      // the same, so the AI never contradicts itself on one screen.
+      if (!(this.netProfit && this.netProfit.labor_has_data)) {
+        return { kind:'data', title:'Podłącz koszty pracy (RCP)',
+          why:'Bez kosztów pracy zysk netto jest zawyżony — to największa luka w Twoich liczbach.',
+          impact:'Urealni zysk netto', cta:'Jak to zrobić?', tab:null,
+          prompt:'Jak podłączyć dane RCP/grafiku pracy z GoPOS, żeby liczyć koszty pracy w zysku netto?' };
+      }
+      const worst = (this.foodCost?.dish_breakdown || []).slice().sort((a,b)=>(b.total_cost||0)-(a.total_cost||0))[0];
+      if (worst) {
+        return { kind:'move', title:'Popraw marżę: '+worst.dish_name,
+          why:'Najwyższy koszt składników w menu ('+this.fmtPLNc(worst.cost_per_dish)+'/porcja, '+worst.units_sold+'× w 30 dni).',
+          impact:'Bezpośrednio podnosi zysk netto', cta:'Pogadaj o tym', tab:null,
+          prompt:'Jak poprawić marżę dania '+worst.dish_name+', żeby podnieść mój zysk netto? Daj konkretny plan w oparciu o moje dane.' };
+      }
+      return null;
+    },
+    focusAct(f) {
+      if (!f) return;
+      if (f.prompt) { this.tab = 'chat'; this.$nextTick(() => { if (typeof this.send === 'function') this.send(f.prompt); }); }
+      else if (f.tab) { this.go(f.tab); }
+    },
+    /* Goals shown under "Twoje cele" — minus the cost levers already in the north star */
+    customGoals() {
+      const inStar = ['net_margin_pct', 'food_cost_pct', 'labor_pct'];
+      return (this.goals || []).filter(g => !inStar.includes(g.metric));
     },
     async saveGoal() {
       if (!this.goalForm.title.trim()) { this.toast('Podaj nazwę celu', 'err'); return; }
@@ -3808,6 +4233,7 @@ function app() {
       return new Intl.NumberFormat('pl-PL', { style: 'currency', currency: 'PLN', maximumFractionDigits: dec, minimumFractionDigits: 0 }).format(v);
     },
     fmtPLNc(v) { if (v == null) return '—'; return plnFmt(v, v >= 10000); },
+    fmtZl2(v) { if (v == null) return '—'; return new Intl.NumberFormat('pl-PL', { style: 'currency', currency: 'PLN', minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(v); },
     fmtInt(v) { if (v == null) return '—'; return new Intl.NumberFormat('pl-PL', { maximumFractionDigits: 0 }).format(v); },
     plDay(d) { return PL_DAYS[d] ?? '—'; },
     md(t) { try { return marked.parse(t || ''); } catch { return t || ''; } },
@@ -3819,8 +4245,7 @@ function app() {
       return Math.round(h / 24) + ' dni temu';
     },
     periodLabel() {
-      if (!this.kpis?.period_start) return 'Ostatnie 30 dni';
-      return `${this.kpis.period_start} → ${this.kpis.period_end} · dane z GoPOS`;
+      return `dane na żywo z GoPOS`;
     },
     toast(msg, type = 'ok') {
       const id = ++this._tid;

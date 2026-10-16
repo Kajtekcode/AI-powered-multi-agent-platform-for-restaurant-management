@@ -266,19 +266,103 @@ class AnalyticsRepository:
     # Real net profit                                                        #
     # ===================================================================== #
 
+    @staticmethod
+    def _parse_money(text) -> Optional[float]:
+        """Best-effort parse of a free-text PLN amount: '16 000', '16000 zł', '16 tys', '20k'."""
+        if text is None:
+            return None
+        import re as _re
+        s = str(text).lower().replace(" ", " ")
+        mult = 1000 if ("tys" in s or _re.search(r"\d\s*k(\b|\s|$)", s)) else 1
+        m = _re.search(r"\d[\d \.]*(,\d+)?", s)
+        if not m:
+            return None
+        num = m.group(0).replace(" ", "").replace(".", "").replace(",", ".")
+        try:
+            v = float(num) * mult
+            return v if v > 0 else None
+        except ValueError:
+            return None
+
+    @staticmethod
+    def _sum_money(text) -> float:
+        """Sum every PLN amount mentioned in free text. '4000 zł, 800 zł, 1,5 tys' → 6300."""
+        if text is None:
+            return 0.0
+        import re as _re
+        total = 0.0
+        for m in _re.finditer(r"\d[\d \.]*(?:,\d+)?\s*(tys|k\b)?", str(text).lower()):
+            raw = m.group(0)
+            mult = 1000 if (m.group(1)) else 1
+            num = _re.sub(r"[^\d,\.]", "", raw).replace(".", "").replace(",", ".")
+            try:
+                v = float(num) * mult
+                if v > 0:
+                    total += v
+            except ValueError:
+                continue
+        return total
+
+    def _overhead_from_profile(self, store) -> list:
+        """When no overhead is explicitly tracked, derive it from the audit profile:
+        declared rent + the sum of other fixed costs. Lets net profit be honest the
+        moment the audit is done, before the user fills the cost tracker by hand."""
+        prof = store.get_profile() or {}
+        out = []
+        rent = self._parse_money(prof.get("rent"))
+        if rent:
+            out.append({"category": "Czynsz", "monthly_amount": round(rent, 2), "source": "audyt"})
+        other = self._sum_money(prof.get("fixed_costs_other"))
+        if other:
+            out.append({"category": "Pozostałe koszty stałe", "monthly_amount": round(other, 2), "source": "audyt"})
+        return out
+
+    def _resolve_overheads(self, store):
+        """Tracked overhead if present, else declared-from-audit. Returns (list, source)."""
+        oh = store.get_overhead_costs()
+        if oh:
+            return oh, "tracked"
+        derived = self._overhead_from_profile(store)
+        return derived, ("audyt" if derived else "none")
+
+    def _labor_cost_for_period(self, store, labor, period_days):
+        """Returns (labor_cost, source). GoPOS RCP if available, else the audit's declared
+        monthly payroll prorated, else 0. 'source' ∈ {'rcp','declared','none'}.
+
+        Guard: freshly-adopted RCP covers only a slice of the staff, so its total can
+        be far below reality. If RCP reports well under the declared payroll for the
+        same period, the declared figure is the honest one — otherwise net profit
+        would be silently overstated the day RCP goes live."""
+        rcp = float(labor.get("total_cost") or 0.0) if labor.get("has_data") else None
+        declared_pd = None
+        try:
+            declared = self._parse_money((store.get_profile() or {}).get("labor_cost_monthly"))
+            if declared:
+                declared_pd = round(declared / 30.0 * period_days, 2)
+        except Exception:
+            pass
+        if rcp is not None:
+            if declared_pd and rcp < 0.6 * declared_pd:
+                return declared_pd, "declared"  # RCP too incomplete to trust yet
+            return rcp, "rcp"
+        if declared_pd:
+            return declared_pd, "declared"
+        return 0.0, "none"
+
     def calculate_real_net_profit(self, store, days: int = 30) -> Dict[str, Any]:
         fc = self.calculate_food_cost_pct(store, days)
-        overheads = store.get_overhead_costs()
+        overheads, oh_source = self._resolve_overheads(store)
         labor = self.get_labor_cost(days)
         monthly_oh = sum(o["monthly_amount"] for o in overheads)
         prorated_oh = monthly_oh / 30 * days
         revenue = fc["full_period_revenue"]
         food = fc["total_food_cost"]
-        labor_cost = labor["total_cost"] if labor["has_data"] else 0.0
+        labor_cost, labor_src = self._labor_cost_for_period(store, labor, days)
+        has_labor = labor_src != "none"
         net = revenue - food - labor_cost - prorated_oh
         # Honesty about what the figure includes
         missing = []
-        if not labor["has_data"]:
+        if not has_labor:
             missing.append("koszty pracy")
         if not overheads:
             missing.append("koszty stałe")
@@ -292,13 +376,15 @@ class AnalyticsRepository:
         return {
             "period_days": days, "revenue": revenue, "food_cost": food,
             "food_cost_pct": fc["food_cost_pct"], "labor_cost": round(labor_cost, 2),
-            "labor_pct": labor.get("labor_pct"), "labor_has_data": labor["has_data"],
+            "labor_pct": round(labor_cost / revenue * 100, 1) if revenue > 0 else None,
+            "labor_has_data": has_labor, "labor_source": labor_src,
             "overhead": round(prorated_oh, 2), "overhead_monthly_total": round(monthly_oh, 2),
+            "overhead_source": oh_source,
             "net_profit": round(net, 2),
             "net_margin_pct": round(net / revenue * 100, 2) if revenue > 0 else 0.0,
             "overhead_breakdown": overheads,
             "complete": complete, "missing_components": missing, "basis_note": basis_note,
-            "double_count_warning": self._payroll_warning(overheads, labor["has_data"]),
+            "double_count_warning": self._payroll_warning(overheads, has_labor),
         }
 
     def calculate_real_net_profit_range(self, store, date_from: str, date_to: str) -> Dict[str, Any]:
@@ -311,20 +397,24 @@ class AnalyticsRepository:
         coverage = self.get_sales_summary_range(date_from, date_to)
         fc = self._food_cost_between(store, date_from, date_to, by_date=True)
         labor = self.get_labor_cost_range(date_from, date_to)
-        overheads = store.get_overhead_costs()
+        overheads, oh_source = self._resolve_overheads(store)
         monthly_oh = sum(o["monthly_amount"] for o in overheads)
         prorated_oh = monthly_oh / 30 * period_days
         revenue = fc["full_period_revenue"]
         food = fc["total_food_cost"]
-        labor_cost = labor["total_cost"] if labor["has_data"] else 0.0
+        labor_cost, labor_src = self._labor_cost_for_period(store, labor, period_days)
+        has_labor = labor_src != "none"
         net = revenue - food - labor_cost - prorated_oh
 
         basis = [
             "Przychód i sprzedane sztuki: rzeczywiste dane z tego okresu.",
-            ("Koszty pracy: rzeczywiste grafiki z tego okresu." if labor["has_data"]
-             else "Koszty pracy: brak grafików z tego okresu (przyjęto 0)."),
+            ("Koszty pracy: rzeczywiste grafiki z tego okresu." if labor_src == "rcp"
+             else ("Koszty pracy: szacunek z deklarowanego miesięcznego kosztu wynagrodzeń." if labor_src == "declared"
+                   else "Koszty pracy: brak danych (przyjęto 0).")),
             "Food cost: sztuki z okresu × AKTUALNE receptury i ceny.",
-            f"Koszty stałe: AKTUALNE stawki proporcjonalnie ({period_days} dni).",
+            (f"Koszty stałe: AKTUALNE stawki proporcjonalnie ({period_days} dni)." if oh_source == "tracked"
+             else (f"Koszty stałe: z audytu (czynsz + pozostałe), proporcjonalnie ({period_days} dni)." if oh_source == "audyt"
+                   else "Koszty stałe: brak danych (przyjęto 0).")),
         ]
         return {
             "date_from": date_from, "date_to": date_to, "period_days": period_days,
@@ -334,9 +424,11 @@ class AnalyticsRepository:
                               "complete": coverage.get("data_complete", False)},
             "revenue": revenue, "food_cost": food, "food_cost_pct": fc["food_cost_pct"],
             "dishes_with_recipes": fc["dishes_with_recipes"],
-            "labor_cost": round(labor_cost, 2), "labor_pct": labor.get("labor_pct"),
-            "labor_has_data": labor["has_data"], "overhead": round(prorated_oh, 2),
-            "overhead_monthly_total": round(monthly_oh, 2), "net_profit": round(net, 2),
+            "labor_cost": round(labor_cost, 2),
+            "labor_pct": round(labor_cost / revenue * 100, 1) if revenue > 0 else None,
+            "labor_has_data": has_labor, "labor_source": labor_src, "overhead": round(prorated_oh, 2),
+            "overhead_monthly_total": round(monthly_oh, 2), "overhead_source": oh_source,
+            "net_profit": round(net, 2),
             "net_margin_pct": round(net / revenue * 100, 2) if revenue > 0 else 0.0,
             "basis_note": " ".join(basis),
             "double_count_warning": self._payroll_warning(overheads, labor["has_data"]),
@@ -356,7 +448,7 @@ class AnalyticsRepository:
     # ===================================================================== #
 
     def get_today_basics(self, store) -> Dict[str, Any]:
-        now = datetime.now()
+        now = datetime.now()  # "today" = the real calendar day; live data arrives via GoPOS sync
         today = now.date()
         day_lo = datetime.combine(today, datetime.min.time())
         day_hi = day_lo + timedelta(days=1)
@@ -379,12 +471,21 @@ class AnalyticsRepository:
         ).one()
         labor_shifts, labor_cost_today = lab[0] or 0, float(lab[1])
 
-        overheads = store.get_overhead_costs()
+        # Daily fixed costs = overhead (tracked, else declared from audit) + labor.
+        overheads, _oh_src = self._resolve_overheads(store)
         daily_oh = sum(o["monthly_amount"] for o in overheads) / 30.0
         fc = self.calculate_food_cost_pct(store, days=30)
         fc_pct = fc["food_cost_pct"] if fc["dishes_with_recipes"] > 0 else 0.0
 
-        fixed_today = daily_oh + labor_cost_today
+        # Labor for the breakeven: real shifts today if logged, otherwise the declared
+        # monthly payroll prorated to one day (so the threshold isn't falsely 0).
+        labor_be, labor_be_est = labor_cost_today, False
+        if labor_be <= 0:
+            declared = self._parse_money((store.get_profile() or {}).get("labor_cost_monthly"))
+            if declared:
+                labor_be, labor_be_est = round(declared / 30.0, 2), True
+
+        fixed_today = daily_oh + labor_be
         breakeven = fixed_today / (1 - fc_pct / 100) if 0 < fc_pct < 95 else fixed_today
         vs = revenue_today - breakeven
         return {
@@ -394,8 +495,10 @@ class AnalyticsRepository:
             "labor": {"shifts": labor_shifts, "cost": round(labor_cost_today, 2)},
             "breakeven": {
                 "revenue_needed": round(breakeven, 2), "daily_overhead": round(daily_oh, 2),
-                "labor_today": round(labor_cost_today, 2), "food_cost_pct_used": fc_pct,
+                "labor_today": round(labor_be, 2), "labor_estimated": labor_be_est,
+                "food_cost_pct_used": fc_pct,
                 "vs_breakeven": round(vs, 2), "above": vs >= 0,
+                "estimated": (daily_oh > 0 and _oh_src == "audyt") or labor_be_est,
                 "progress_pct": round(min(revenue_today / breakeven * 100, 999), 1) if breakeven > 0 else None,
             },
         }
@@ -406,13 +509,27 @@ class AnalyticsRepository:
 
     def get_today_live(self, store) -> Dict[str, Any]:
         basics = self.get_today_basics(store)
-        now = datetime.now()
+        now = datetime.now()  # "today" = the real calendar day; live data arrives via GoPOS sync
         today = now.date()
         day_lo = datetime.combine(today, datetime.min.time())
         day_hi = day_lo + timedelta(days=1)
 
-        # opening hours for today
+        # opening hours for today + where we are in the day
         hours = self._opening_hours_for(store, today)
+        day_phase = "open"
+        if hours is None:
+            day_phase = "closed_today"          # not an open weekday this season
+        else:
+            try:
+                oh, om = (int(x) for x in str(hours["open"]).split(":")[:2])
+                ch, cm = (int(x) for x in str(hours["close"]).split(":")[:2])
+                minute_now = now.hour * 60 + now.minute
+                if minute_now < oh * 60 + om:
+                    day_phase = "before_open"
+                elif minute_now >= ch * 60 + cm:
+                    day_phase = "after_close"
+            except (ValueError, KeyError, AttributeError):
+                pass
 
         # top items today
         rows = self.db.execute(
@@ -432,13 +549,35 @@ class AnalyticsRepository:
         projection = self._project_eod(now, basics["revenue"], typical_hourly, typical_days)
         pace = self._pace_vs_last_week(now, basics["revenue"])
 
+        # When today is empty/closed, surface the last day that actually sold —
+        # far more useful than a wall of zeros.
+        recent_day = self._last_sales_day(today) if (basics.get("orders") or 0) == 0 else None
+
         basics.update({
             "weekday": weekday, "is_open_day": hours is not None, "hours": hours,
+            "day_phase": day_phase,
             "top_items": top_items, "hourly_today": hourly_today,
             "hourly_typical": [{"hour": h, "revenue": round(v, 2)} for h, v in sorted(typical_hourly.items())],
-            "projection": projection, "pace": pace,
+            "projection": projection, "pace": pace, "recent_day": recent_day,
         })
         return basics
+
+    def _last_sales_day(self, before_day) -> Optional[Dict[str, Any]]:
+        """Most recent day (before today) that had sales — for the 'today is empty' view."""
+        lo = datetime.combine(before_day, datetime.min.time())
+        row = self.db.execute(
+            select(func.date(m.Order.closed_at), func.count(),
+                   func.coalesce(func.sum(m.Order.total_price), 0.0))
+            .where(self._t(m.Order), m.Order.status == "CLOSED", m.Order.closed_at < lo)
+            .group_by(func.date(m.Order.closed_at))
+            .order_by(func.date(m.Order.closed_at).desc()).limit(1)
+        ).first()
+        if not row or not row[0]:
+            return None
+        d = row[0] if isinstance(row[0], date) else date.fromisoformat(str(row[0])[:10])
+        PL = ["poniedziałek", "wtorek", "środa", "czwartek", "piątek", "sobota", "niedziela"]
+        return {"date": d.isoformat(), "weekday_label": PL[d.weekday()],
+                "revenue": round(float(row[2]), 2), "orders": int(row[1] or 0)}
 
     def _hourly_for_day(self, day) -> List[Dict]:
         lo = datetime.combine(day, datetime.min.time())
@@ -815,17 +954,61 @@ class AnalyticsRepository:
             if metric == "avg_ticket":
                 return self.get_sales_summary(30)["avg_ticket"]
             if metric == "food_cost_pct":
-                return self.calculate_food_cost_pct(store, 30)["food_cost_pct"]
+                fc = self.calculate_food_cost_pct(store, 30)
+                # 0% is only real if we actually have recipes; otherwise it's missing data,
+                # not a perfect score — return None so the goal shows "brak danych".
+                return fc["food_cost_pct"] if fc.get("dishes_with_recipes") else None
             if metric == "labor_pct":
-                return self.get_labor_cost(30).get("labor_pct")
+                np = self.calculate_real_net_profit(store, 30)
+                return np["labor_pct"] if np.get("labor_has_data") else None
         except Exception as e:
             logger.warning(f"metric {metric} unavailable: {e}")
         return None
 
     def get_goals(self, store, status: str = "active") -> List[Dict]:
+        import json as _json
         goals = store.get_goals_raw(status=status)
         out = []
         for g in goals:
+            # Spec goals (flexible measurement: YoY, quarter, custom range) use the engine.
+            spec_raw = None
+            try:
+                spec_raw = store.get_setting(f"goal_spec:{g.id}")
+            except Exception:
+                pass
+            if spec_raw:
+                try:
+                    spec = _json.loads(spec_raw)
+                    ms = self.measure_spec(store, spec)
+                    pace_info = self._goal_pace(g, ms.get("current_value"), ms.get("progress_pct"), ms.get("reached"))
+                    if ms.get("not_started"):
+                        pace_info = {**pace_info, "pace": "pending", "days_left": pace_info.get("days_left")}
+                    elif ms.get("in_progress") and ms.get("period_pace"):
+                        # Period-based goal: pace comes from the goal's own window
+                        # (elapsed vs collected), not created_at→deadline. Fixes '-311%'.
+                        pace_info = {**pace_info,
+                                     "pace": ms.get("period_pace"),
+                                     "expected_pct": ms.get("elapsed_pct"),
+                                     "days_left": ms.get("days_left")}
+                    out.append({
+                        "id": g.id, "title": g.title, "metric": ms.get("metric") or g.metric,
+                        "target_value": ms.get("target_value"), "direction": g.direction,
+                        "baseline_value": ms.get("baseline_value"),
+                        "current_value": ms.get("current_value"),
+                        "deadline": ms.get("deadline") or (g.deadline.isoformat() if g.deadline else None),
+                        "status": g.status, "notes": g.notes,
+                        "progress_pct": ms.get("progress_pct"), "reached": ms.get("reached"),
+                        "spec": spec, "comparison": ms.get("comparison"),
+                        "period_from": ms.get("period_from"), "period_to": ms.get("period_to"),
+                        "measurable": ms.get("measurable"), "missing": ms.get("missing"),
+                        "not_started": ms.get("not_started"), "starts_in_days": ms.get("starts_in_days"),
+                        "in_progress": ms.get("in_progress"), "elapsed_pct": ms.get("elapsed_pct"),
+                        **pace_info,
+                    })
+                    continue
+                except Exception as e:
+                    logger.warning(f"spec goal {g.id} measure failed, legacy fallback: {e}")
+
             current = (self._current_metric_value(store, g.metric)
                        if g.metric != "manual" else g.baseline_value)
             progress = None
@@ -883,6 +1066,178 @@ class AnalyticsRepository:
         """Create a goal, snapshotting the current metric value as baseline."""
         baseline = (self._current_metric_value(store, metric) if metric != "manual" else None)
         return store.create_goal(title, metric, target_value, direction, deadline, notes, baseline)
+
+    # ===================================================================== #
+    # Flexible goal measurement engine                                       #
+    # A goal carries a "spec" (metric × window × comparison × deadline).     #
+    # This computes current/baseline/target/progress/pace for ANY spec —     #
+    # year-over-year, quarter, custom range — not just a fixed 30-day window. #
+    # ===================================================================== #
+
+    @staticmethod
+    def _month_end(d: "date") -> "date":
+        nm = date(d.year + (d.month // 12), (d.month % 12) + 1, 1)
+        return nm - timedelta(days=1)
+
+    def _resolve_window(self, win: Dict) -> tuple:
+        """Resolve a window spec to (date_from, date_to) ISO strings."""
+        today = self.reference_now().date()
+        win = win or {}
+        typ = win.get("type", "rolling")
+        unit = win.get("unit", "days")
+        if typ == "custom" and win.get("from") and win.get("to"):
+            return win["from"][:10], win["to"][:10]
+        if typ == "rolling":
+            n = int(win.get("n", 30))
+            return (today - timedelta(days=max(n, 1) - 1)).isoformat(), today.isoformat()
+        # calendar (full period) or to_date (period start → today)
+        to_date = (typ == "to_date")
+        if unit == "year":
+            start = date(today.year, 1, 1)
+            end = today if to_date else date(today.year, 12, 31)
+        elif unit == "quarter":
+            q0 = ((today.month - 1) // 3) * 3 + 1
+            start = date(today.year, q0, 1)
+            end = today if to_date else self._month_end(date(today.year, q0 + 2, 1))
+        else:  # month
+            start = date(today.year, today.month, 1)
+            end = today if to_date else self._month_end(start)
+        return start.isoformat(), end.isoformat()
+
+    @staticmethod
+    def _shift_years(dfrom: str, dto: str, years: int = 1) -> tuple:
+        def back(s):
+            d = date.fromisoformat(s[:10])
+            try:
+                return d.replace(year=d.year - years)
+            except ValueError:  # Feb 29
+                return d.replace(year=d.year - years, day=28)
+        return back(dfrom).isoformat(), back(dto).isoformat()
+
+    @staticmethod
+    def _shift_back_same_length(dfrom: str, dto: str) -> tuple:
+        a = date.fromisoformat(dfrom[:10]); b = date.fromisoformat(dto[:10])
+        length = (b - a).days + 1
+        new_to = a - timedelta(days=1)
+        new_from = new_to - timedelta(days=length - 1)
+        return new_from.isoformat(), new_to.isoformat()
+
+    def _value_over(self, store, metric: str, dfrom: str, dto: str) -> tuple:
+        """Returns (value, data_complete) for a metric over an arbitrary range."""
+        try:
+            if metric in ("revenue", "orders", "avg_ticket"):
+                s = self.get_sales_summary_range(dfrom, dto) or {}
+                v = {"revenue": s.get("total_revenue"), "orders": s.get("order_count"),
+                     "avg_ticket": s.get("avg_ticket")}[metric]
+                return v, bool(s.get("data_complete"))
+            n = self.calculate_real_net_profit_range(store, dfrom, dto) or {}
+            v = {"net_profit": n.get("net_profit"), "net_margin_pct": n.get("net_margin_pct"),
+                 "food_cost_pct": n.get("food_cost_pct"), "labor_pct": n.get("labor_pct")}.get(metric)
+            return v, bool((n.get("data_coverage") or {}).get("complete"))
+        except Exception as e:
+            logger.warning(f"_value_over failed for {metric} {dfrom}..{dto}: {e}")
+            return None, False
+
+    def measure_spec(self, store, spec: Dict) -> Dict:
+        """The heart of flexible goals. Computes everything the UI/AI need for ANY spec."""
+        metric = spec.get("metric")
+        win = spec.get("window") or {"type": "rolling", "unit": "days", "n": 30}
+        dfrom, dto = self._resolve_window(win)
+        today = self.reference_now().date()
+        not_started = date.fromisoformat(dfrom[:10]) > today
+        starts_in_days = (date.fromisoformat(dfrom[:10]) - today).days if not_started else None
+        current, cur_ok = self._value_over(store, metric, dfrom, dto)
+        if not_started:
+            current = None  # a future window has no data yet — that's expected, not a gap
+
+        comp = spec.get("comparison") or {}
+        ctype = comp.get("type", "absolute")
+        operator = comp.get("operator", ">=")
+        baseline, base_ok = None, True
+        if ctype == "yoy":
+            bf, bt = self._shift_years(dfrom, dto, 1)
+            baseline, base_ok = self._value_over(store, metric, bf, bt)
+        elif ctype == "prev_period":
+            bf, bt = self._shift_back_same_length(dfrom, dto)
+            baseline, base_ok = self._value_over(store, metric, bf, bt)
+        elif ctype == "baseline_snapshot":
+            baseline = spec.get("baseline_snapshot")
+
+        # resolve target: either an absolute value, or % growth over the baseline
+        target = comp.get("target")
+        tkind = comp.get("target_kind", "value")
+        target_resolved = target
+        if tkind == "pct_growth" and baseline is not None and target is not None:
+            target_resolved = round(baseline * (1 + target / 100.0), 2)
+
+        # Is the goal's period currently running (started but not finished)?
+        period_start = date.fromisoformat(dfrom[:10])
+        period_end = date.fromisoformat(dto[:10])
+        in_progress = (not not_started) and period_start <= today <= period_end
+        # Additive metrics accumulate over the period → mid-period the "current" is a
+        # partial sum, so comparing it to a full-period baseline is meaningless (that
+        # was the '-311%' bug). Show % of the target reached so far + how much of the
+        # period has elapsed instead.
+        ADDITIVE = {"revenue", "orders", "net_profit"}
+        elapsed_pct, period_pace, days_left = None, None, None
+        progress, reached = None, None
+        if current is not None and target_resolved is not None:
+            if in_progress and metric in ADDITIVE and target_resolved > 0:
+                progress = max(min(round(current / target_resolved * 100, 1), 999), 0)
+                total_days = max((period_end - period_start).days + 1, 1)
+                elapsed_days = min(max((today - period_start).days + 1, 0), total_days)
+                elapsed_pct = round(elapsed_days / total_days * 100, 1)
+                days_left = (period_end - today).days
+                reached = current >= target_resolved
+                if not reached:
+                    period_pace = ("ahead" if progress >= elapsed_pct + 8
+                                   else ("on_track" if progress >= elapsed_pct - 8 else "behind"))
+            else:
+                base_for_progress = baseline if baseline is not None else 0
+                denom = target_resolved - base_for_progress
+                if abs(denom) > 1e-9:
+                    progress = max(min(round((current - base_for_progress) / denom * 100, 1), 999), -999)
+                else:
+                    progress = 100.0
+                reached = (current >= target_resolved) if operator == ">=" else (current <= target_resolved)
+
+        missing = []
+        if not cur_ok and not not_started:
+            missing.append(f"niekompletne dane sprzedaży za okres {dfrom} → {dto}")
+        if ctype == "yoy" and not base_ok:
+            missing.append("brak/niepełne dane za ten sam okres rok temu (potrzebny backfill historii)")
+        if ctype == "prev_period" and not base_ok:
+            missing.append("niepełne dane za poprzedni okres porównawczy")
+        for req in (spec.get("requires") or []):
+            missing.append(req)
+
+        return {
+            "metric": metric, "period_from": dfrom, "period_to": dto,
+            "current_value": round(current, 2) if isinstance(current, (int, float)) else None,
+            "baseline_value": round(baseline, 2) if isinstance(baseline, (int, float)) else None,
+            "target_value": round(target_resolved, 2) if isinstance(target_resolved, (int, float)) else target_resolved,
+            "comparison": ctype, "operator": operator,
+            "progress_pct": progress, "reached": reached,
+            "measurable": len(missing) == 0,
+            "missing": list(dict.fromkeys(missing)),
+            "deadline": spec.get("deadline"),
+            "not_started": not_started, "starts_in_days": starts_in_days,
+            "in_progress": in_progress, "elapsed_pct": elapsed_pct,
+            "period_pace": period_pace, "days_left": days_left,
+        }
+
+    def create_spec_goal(self, store, title: str, spec: Dict, notes: str = None) -> str:
+        """Create a goal whose measurement is driven by a flexible spec (stored as JSON)."""
+        import json as _json
+        metric = spec.get("metric", "manual")
+        comp = spec.get("comparison") or {}
+        target = comp.get("target")
+        direction = "increase" if comp.get("operator", ">=") == ">=" else "decrease"
+        gid = store.create_goal(
+            title, metric, target if isinstance(target, (int, float)) else 0.0,
+            direction, spec.get("deadline"), notes, None)
+        store.set_setting(f"goal_spec:{gid}", _json.dumps(spec, ensure_ascii=False))
+        return gid
 
     # ===================================================================== #
     # Labor by day, sales by direction, employee performance                 #

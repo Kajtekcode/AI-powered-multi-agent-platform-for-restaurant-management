@@ -87,4 +87,50 @@ def init_db():
     import app.models.domain  # noqa
     import app.models.future  # noqa
     Base.metadata.create_all(bind=engine)
+    _ensure_columns()
     logger.info(f"DB schema ensured on {'SQLite' if IS_SQLITE else 'PostgreSQL'}")
+
+
+def _ensure_columns():
+    """Lightweight idempotent column adds for SQLite dev DBs (create_all won't ALTER
+    existing tables). Production uses Alembic; this is a safe no-op there."""
+    if not IS_SQLITE:
+        return
+    from sqlalchemy import text
+    add = [("ingredient_price_history", "category", "VARCHAR(20)"),
+           ("chat_messages", "thread_id", "VARCHAR(36)")]
+    added = set()
+    with engine.begin() as conn:
+        for table, col, coltype in add:
+            cols = [r[1] for r in conn.execute(text(f"PRAGMA table_info({table})")).fetchall()]
+            if col not in cols:
+                conn.execute(text(f"ALTER TABLE {table} ADD COLUMN {col} {coltype}"))
+                logger.info(f"DB migrate: added {table}.{col}")
+                added.add((table, col))
+    if ("chat_messages", "thread_id") in added:
+        _backfill_chat_threads()
+
+
+def _backfill_chat_threads(gap_hours: int = 12):
+    """Assign thread_ids to pre-existing chat rows so old conversations still show
+    up in history (grouped by >gap_hours idle gaps), rather than vanishing."""
+    import uuid
+    from datetime import timedelta
+    from sqlalchemy import text
+    gap = timedelta(hours=gap_hours)
+    with engine.begin() as conn:
+        rows = conn.execute(text(
+            "SELECT id, tenant_id, session, created_at FROM chat_messages "
+            "WHERE thread_id IS NULL ORDER BY tenant_id, session, created_at ASC"
+        )).fetchall()
+        from datetime import datetime as _dt
+        prev_key, prev_at, tid = None, None, None
+        for rid, tenant_id, session, created_at in rows:
+            key = (tenant_id, session)
+            at = created_at if isinstance(created_at, _dt) else _dt.fromisoformat(str(created_at))
+            if key != prev_key or prev_at is None or (at - prev_at) > gap:
+                tid = uuid.uuid4().hex[:32]
+            conn.execute(text("UPDATE chat_messages SET thread_id = :t WHERE id = :i"),
+                         {"t": tid, "i": rid})
+            prev_key, prev_at = key, at
+    logger.info(f"DB migrate: backfilled chat_messages.thread_id ({len(rows)} rows)")

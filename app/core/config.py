@@ -37,7 +37,9 @@ class Settings(BaseSettings):
     openai_api_key: str = Field(default="", alias="OPENAI_API_KEY")
     openai_base_url: Optional[str] = Field(default=None, alias="OPENAI_BASE_URL")
     openai_model: str = Field(default="gpt-4o", alias="OPENAI_MODEL")
-    openai_vision_model: str = Field(default="grok-2-vision-1212", alias="OPENAI_VISION_MODEL")
+    # Empty → fall back to the (multimodal) chat model. Avoids hardcoding a model
+    # name that the provider may retire (e.g. grok-2-vision-1212 → 'Model not found').
+    openai_vision_model: str = Field(default="", alias="OPENAI_VISION_MODEL")
 
     # Database
     duckdb_path: str = Field(default="data/gopos.duckdb", alias="DUCKDB_PATH")

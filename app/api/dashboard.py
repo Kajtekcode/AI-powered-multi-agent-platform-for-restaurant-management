@@ -94,7 +94,7 @@ async def get_dow_stats(days: int = 90, repos: Repos = Depends(get_repos)):
 class GoalBody(BaseModel):
     title: str
     metric: str
-    target_value: float
+    target_value: float | None = None   # null for qualitative ("manual") goals
     direction: str = "increase"
     deadline: str | None = None
     notes: str | None = None
@@ -253,4 +253,22 @@ async def get_status(repos: Repos = Depends(get_repos)):
     status = repos.analytics.get_data_status(repos.store)
     status["gopos_configured"] = settings.gopos_configured
     status["llm_configured"] = settings.llm_configured
+    status["last_sync"] = repos.store.get_sync_state("last_sync")
     return status
+
+
+class RestaurantProfileBody(BaseModel):
+    name: str | None = None
+    city: str | None = None
+
+
+@router.post("/restaurant")
+async def update_restaurant(body: RestaurantProfileBody, repos: Repos = Depends(get_repos)):
+    """Update the restaurant's display name / city."""
+    t = repos.tenant
+    if body.name is not None and body.name.strip():
+        t.name = body.name.strip()[:120]
+    if body.city is not None:
+        t.city = body.city.strip()[:80] or None
+    repos.store.db.commit()
+    return {"status": "saved", "name": t.name, "city": t.city}

@@ -3,8 +3,8 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Restaurant Growth OS — Konfiguracja</title>
-<link rel="stylesheet" href="/static/design-system.css">
+<title>Mise — Konfiguracja</title>
+<link rel="stylesheet" href="/static/design-system.css?v=3">
 <style>
   body{display:flex;flex-direction:column;min-height:100dvh}
   .screen{flex:1;display:flex;flex-direction:column;max-width:480px;width:100%;margin:0 auto}
@@ -43,9 +43,9 @@
 <body x-data="onboarding()" x-cloak>
   <div class="screen">
     <div class="top">
-      <div class="brand"><span class="mark">◍</span><b>Growth OS</b></div>
+      <div class="brand"><span class="mark">◍</span><b class="serif" style="font-family:var(--font-display); font-size:19px;">Mise</b></div>
       <div style="display:flex;align-items:center;gap:10px">
-        <span class="meta" x-text="'SETUP · ' + String(rank+1).padStart(2,'0') + '/06'"></span>
+        <span class="meta" x-text="'Krok ' + (rank+1) + ' z 6'"></span>
         <button class="theme-toggle" @click="toggleTheme()" x-text="theme==='dark'?'☀':'☾'"></button>
       </div>
     </div>
@@ -57,8 +57,7 @@
         </template>
       </div>
 
-      <div class="kicker mono" x-text="'// krok ' + String(rank+1).padStart(2,'0') + ' — ' + (current?.shortLabel||'')"></div>
-      <h1 style="margin-top:var(--s-3)" x-text="current?.title || ''"></h1>
+      <h1 x-text="current?.title || ''"></h1>
       <p class="lede" x-text="current?.lede || ''"></p>
 
       <div class="list">
@@ -105,14 +104,14 @@ function onboarding(){
        lede:'Krótki wywiad z CEO Agentem. Buduje profil firmy, na którym opiera się każda rekomendacja.',
        cta:'Rozpocznij audyt', hint:'Ok. 5 minut. Możesz przerwać i wrócić.', skippable:true},
       {key:'research_done', label:'Analiza rynku', shortLabel:'rynek', title:'Analiza otoczenia',
-       lede:'Sprawdzamy konkurencję i obecność online, żeby rekomendacje były osadzone w realiach rynku.',
-       cta:'Uruchom analizę', hint:'Dzieje się automatycznie po audycie.'},
+       lede:'Konkurencję i obecność online sprawdzamy automatycznie podczas audytu — wnioski trafiają do raportu otwarcia.',
+       cta:'Dalej', hint:'Gotowe razem z audytem — nic nie musisz robić.'},
       {key:'recipes_added', label:'Przepisy i koszty', shortLabel:'przepisy', title:'Dodaj przepisy',
        lede:'Receptury pozwalają liczyć food cost i realne marże. Dodaj ręcznie lub ze zdjęcia menu.',
        cta:'Dodaj przepisy', hint:'Wystarczy zacząć od kilku najważniejszych dań.', skippable:true},
-      {key:'briefing_active', label:'Poranny briefing', shortLabel:'briefing', title:'Wszystko gotowe',
-       lede:'Włącz poranny briefing — od jutra dostajesz konkretny plan działania każdego ranka.',
-       cta:'Włącz briefing i otwórz panel', hint:'Możesz to później zmienić w ustawieniach.'},
+      {key:'briefing_active', label:'Plan na dziś', shortLabel:'plan', title:'Wszystko gotowe',
+       lede:'Twój panel jest gotowy. Każdego ranka na zakładce „Dziś" czeka konkretny plan — jeden ruch, który najbardziej zbliża Cię do celu zysku netto.',
+       cta:'Otwórz panel', hint:'Plan na dziś znajdziesz zawsze na ekranie „Dziś".'},
     ],
     get current(){ return this.steps[this.rank]; },
 
