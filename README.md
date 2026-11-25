@@ -235,3 +235,10 @@ The app follows the system setting; the sidebar toggle overrides the mode (saved
 
 **Scheduler/sync does not run in tests**
 Set `DISABLE_SCHEDULER=true`.
+
+## Screenshots
+
+<img width="383" height="841" alt="Screenshot 2026-11-25 at 09 38 26" src="https://github.com/user-attachments/assets/ea36e9e1-5e45-4095-a573-7cbcf65f76d4" />
+<img width="378" height="835" alt="Screenshot 2026-11-25 at 09 38 41" src="https://github.com/user-attachments/assets/6e6a8661-ed11-4859-b7cb-90a219223adc" />
+<img width="387" height="848" alt="Screenshot 2026-11-25 at 09 38 57" src="https://github.com/user-attachments/assets/a41b68dc-6d64-49ec-a5d2-602a7c82252e" />
+<img width="386" height="845" alt="Screenshot 2026-11-25 at 09 39 10" src="https://github.com/user-attachments/assets/13fca6dc-7672-4bc0-ac00-21ba48b64372" />
