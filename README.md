@@ -1,5 +1,11 @@
 # 🍽️ Restaurant Growth OS
 
+<p align="center">
+  <img width="260" height="563" alt="gambas-demo" src="https://github.com/user-attachments/assets/d699a396-aac2-48fb-82f1-80606ff8a8ea" />
+</p>
+
+
+
 **A SaaS platform for restaurants — your team of AI managers.** Five specialized
 agents analyze data from the GoPOS point-of-sale system, audit your business, track
 your break-even point, calculate your actual net profit, and prepare a practical
